@@ -82,6 +82,7 @@ export default function Login() {
 
   // Credenciais de desenvolvimento/teste
   const credenciaisMock = {
+    'admin@facerec.com': { senha: 'FaceRec@123', role: 'admin', nome: 'Administrador FaceRec' },
     'admin@escola.com': { senha: '123456', role: 'admin', nome: 'Administrador Sistema' },
     'administrador@escola.com': { senha: '123456', role: 'admin', nome: 'Administrador FaceRec' },
     'professor@escola.com': { senha: '123456', role: 'professor', nome: 'Professor Silva' },
