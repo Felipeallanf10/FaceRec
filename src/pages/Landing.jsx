@@ -12,7 +12,7 @@ export default function Landing() {
             <p className="p max-w-prose">Gerencie stream, snapshots e gravações sem ruído visual. Um layout minimalista que favorece o que importa: o vídeo.</p>
             <div className="flex gap-3">
               <a className="btn-solid" href="/camera">Abrir app</a>
-              <a className="btn-ghost" href="/dashboard">Dashboard</a>
+              <a className="btn-ghost" href="/alunos">Alunos</a>
             </div>
           </div>
           <div className="card p-4 md:p-6 fade-in">

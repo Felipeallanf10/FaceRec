@@ -16,7 +16,7 @@ export default function ModalPrivacidade({ isOpen, onClose }) {
               </div>
               <div>
                 <h2 className="text-xl font-bold text-gray-900">Política de Privacidade</h2>
-                <p className="text-sm text-gray-600">FaceRec AI - Sistema de Reconhecimento</p>
+                <p className="text-sm text-gray-600">FaceRec - Sistema de Reconhecimento</p>
               </div>
             </div>
             <button
@@ -46,7 +46,7 @@ export default function ModalPrivacidade({ isOpen, onClose }) {
                 1. Coleta de Dados
               </h3>
               <div className="text-gray-700 space-y-2">
-                <p>O FaceRec AI coleta os seguintes tipos de informação:</p>
+                <p>O FaceRec coleta os seguintes tipos de informação:</p>
                 <ul className="list-disc pl-6 space-y-1">
                   <li><strong>Dados de Cadastro:</strong> Nome completo, email, telefone, CPF</li>
                   <li><strong>Fotos Biométricas:</strong> Imagens faciais para reconhecimento</li>
@@ -135,7 +135,7 @@ export default function ModalPrivacidade({ isOpen, onClose }) {
               <div className="bg-gray-50 rounded-lg p-4">
                 <p className="text-gray-700 mb-2">Para questões sobre privacidade:</p>
                 <ul className="text-sm text-gray-600 space-y-1">
-                  <li><strong>Email:</strong> privacidade@facerec.ai</li>
+                  <li><strong>Email:</strong> privacidade@facerec.com</li>
                   <li><strong>Telefone:</strong> (11) 9999-9999</li>
                   <li><strong>Endereço:</strong> Rua da Tecnologia, 123 - São Paulo, SP</li>
                 </ul>

@@ -1,8 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/login';
 import Cadastro from './pages/Cadastro';
-import Home from './pages/Home';
-import Dashboard from './pages/Dashboard';
 import Configuracoes from './pages/Configuracoes';
 import MainLayout from './Layout/MainLayout';
 import TestPage from './pages/TestPage';
@@ -50,29 +48,12 @@ function AppRoutes() {
       {/* Rotas privadas (sempre com MainLayout + PrivateRoute) */}
       <Route
         path="/home"
-        element={
-          <MainLayout>
-            <PrivateRoute><Home /></PrivateRoute>
-          </MainLayout>
-        }
-      />
-
-      <Route
-        path="/home"
-        element={
-          <MainLayout>
-            <PrivateRoute><Home /></PrivateRoute>
-          </MainLayout>
-        }
+        element={<Navigate to="/alunos" replace />}
       />
 
       <Route
         path="/dashboard"
-        element={
-          <MainLayout>
-            <PrivateRoute><Dashboard /></PrivateRoute>
-          </MainLayout>
-        }
+        element={<Navigate to="/alunos" replace />}
       />
 
       <Route

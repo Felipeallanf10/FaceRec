@@ -143,7 +143,7 @@ export default function Homepage() {
                   <div className="w-3 h-3 rounded-full" style={{background: '#ffbd2e'}}></div>
                   <div className="w-3 h-3 rounded-full" style={{background: '#27ca3f'}}></div>
                 </div>
-                <div className="text-white/60 text-sm">facerec.ai/dashboard</div>
+                <div className="text-white/60 text-sm">facerec.com/dashboard</div>
               </div>
 
               {/* Content Area */}
