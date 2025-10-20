@@ -26,7 +26,7 @@ export default function MainLayout({ children }) {
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('usuario');
-    navigate('/login');
+    navigate('/'); // Redireciona para a homepage
   };
 
   // Função para obter nome de exibição

@@ -15,8 +15,8 @@ export default function ModalTermos({ isOpen, onClose }) {
                 <FileText className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-gray-900">Termos de Uso</h2>
-                <p className="text-sm text-gray-600">FaceRec AI - Sistema de Reconhecimento Facial</p>
+                <h2 className="text-xl font-bold text-gray-900">Termos e Condições</h2>
+                <p className="text-sm text-gray-600">FaceRec - Sistema de Reconhecimento Facial</p>
               </div>
             </div>
             <button
@@ -37,7 +37,7 @@ export default function ModalTermos({ isOpen, onClose }) {
               <span className="font-semibold text-sm">Última atualização: 09 de Outubro de 2025</span>
             </div>
             <p className="text-indigo-700 text-sm mt-1">
-              Ao usar o FaceRec AI, você concorda com estes termos e condições.
+              Ao usar o FaceRec, você concorda com estes termos e condições.
             </p>
           </div>
 
@@ -51,7 +51,7 @@ export default function ModalTermos({ isOpen, onClose }) {
               </h3>
               <div className="text-gray-700 space-y-3">
                 <p>
-                  Ao acessar e usar o sistema FaceRec AI, você concorda em cumprir e estar 
+                  Ao acessar e usar o sistema FaceRec, você concorda em cumprir e estar 
                   vinculado a estes Termos de Uso. Se você não concordar com qualquer parte 
                   destes termos, não deve usar nosso sistema.
                 </p>
@@ -60,7 +60,7 @@ export default function ModalTermos({ isOpen, onClose }) {
                     <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5" />
                     <p className="text-amber-800 text-sm">
                       <strong>Importante:</strong> Estes termos constituem um acordo legal 
-                      entre você e o FaceRec AI. Leia cuidadosamente.
+                      entre você e o FaceRec. Leia cuidadosamente.
                     </p>
                   </div>
                 </div>
@@ -75,7 +75,7 @@ export default function ModalTermos({ isOpen, onClose }) {
               </h3>
               <div className="text-gray-700 space-y-3">
                 <p>
-                  O FaceRec AI é um sistema de reconhecimento facial para controle de 
+                  O FaceRec é um sistema de reconhecimento facial para controle de 
                   presença em ambiente educacional que oferece:
                 </p>
                 <ul className="list-disc pl-6 space-y-1">
@@ -124,7 +124,7 @@ export default function ModalTermos({ isOpen, onClose }) {
             <section>
               <h3 className="text-lg font-semibold text-gray-900 mb-3">4. Política de Uso Aceitável</h3>
               <div className="text-gray-700 space-y-3">
-                <p>O sistema FaceRec AI deve ser usado exclusivamente para:</p>
+                <p>O sistema FaceRec deve ser usado exclusivamente para:</p>
                 <ul className="list-disc pl-6 space-y-1">
                   <li><strong>Controle de presença educacional:</strong> Chamada automatizada em salas de aula</li>
                   <li><strong>Gestão acadêmica:</strong> Relatórios e estatísticas de frequência</li>
@@ -181,7 +181,7 @@ export default function ModalTermos({ isOpen, onClose }) {
               <div className="text-gray-700 space-y-3">
                 <p>
                   Todos os direitos autorais, marcas registradas e propriedade intelectual 
-                  do FaceRec AI são de propriedade exclusiva dos desenvolvedores.
+                  do FaceRec são de propriedade exclusiva dos desenvolvedores.
                 </p>
                 <div className="bg-gray-50 rounded-lg p-4">
                   <h4 className="font-semibold text-gray-800 mb-2">Direitos Reservados:</h4>
@@ -190,7 +190,7 @@ export default function ModalTermos({ isOpen, onClose }) {
                     <li>• Interface e design do sistema</li>
                     <li>• Código-fonte e arquitetura</li>
                     <li>• Documentação e materiais de treinamento</li>
-                    <li>• Nome e marca FaceRec AI</li>
+                    <li>• Nome e marca FaceRec</li>
                   </ul>
                 </div>
               </div>
@@ -215,7 +215,7 @@ export default function ModalTermos({ isOpen, onClose }) {
                   </div>
                 </div>
                 <p>
-                  O FaceRec AI não se responsabiliza por danos indiretos, perda de dados 
+                  O FaceRec não se responsabiliza por danos indiretos, perda de dados 
                   ou interrupções de serviço fora de nosso controle.
                 </p>
               </div>
@@ -241,7 +241,7 @@ export default function ModalTermos({ isOpen, onClose }) {
                   <div>
                     <h4 className="font-semibold text-gray-800 mb-2">📧 Questões Legais:</h4>
                     <ul className="text-sm text-gray-700 space-y-1">
-                      <li><strong>Email:</strong> juridico@facerec.ai</li>
+                      <li><strong>Email:</strong> juridico@facerec.com</li>
                       <li><strong>Telefone:</strong> (11) 9999-7777</li>
                       <li><strong>Horário:</strong> Seg-Sex, 9h às 17h</li>
                     </ul>
@@ -263,7 +263,7 @@ export default function ModalTermos({ isOpen, onClose }) {
             <CheckCircle className="w-8 h-8 text-indigo-600 mx-auto mb-3" />
             <h4 className="font-bold text-indigo-900 mb-2">Acordo Aceito</h4>
             <p className="text-sm text-indigo-700">
-              Ao usar o FaceRec AI, você confirma ter lido, compreendido e 
+              Ao usar o FaceRec, você confirma ter lido, compreendido e 
               concordado com todos os termos e condições acima descritos.
             </p>
           </div>

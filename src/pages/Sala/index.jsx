@@ -11,7 +11,7 @@ import CameraReconhecimento from '../../Components/CameraReconhecimento';
  * 
  * Funcionalidades:
  * - Lista todos os alunos da sala com fotos
- * - Botões para reconhecimento facial e chamada manual  
+ * - Reconhecimento facial automático
  * - Interface para marcar presença
  * - Informações da turma e professor
  */
@@ -368,16 +368,7 @@ const Sala = () => {
               <h2 className="text-lg font-semibold text-gray-800">Reconhecimento Facial Automático</h2>
               <p className="text-gray-600 text-sm">Aponte a câmera para a sala - o sistema identificará automaticamente quem está presente</p>
             </div>
-          </div>            <div className="flex space-x-3">
-              {/* Botão Secundário - Chamada Manual */}
-              <button
-                onClick={() => navigate(`/sala/${id}/manual`)}
-                className="flex items-center space-x-2 px-4 py-4 bg-yellow-100 hover:bg-yellow-200 text-yellow-800 rounded-lg font-medium transition-colors border border-yellow-300"
-              >
-                <Users className="w-5 h-5" />
-                <span>Chamada Manual</span>
-              </button>
-
+          </div>          <div className="flex space-x-3">
               {/* Botão Limpar */}
               {totalPresentes > 0 && (
                 <button

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug FaceRec</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+        .debug-box {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 10px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .status.success { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .status.warning { background: #fff3cd; color: #856404; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug do FaceRec</h1>
+    
+    <div class="debug-box">
+        <h3>📡 Status dos Serviços</h3>
+        <p>Frontend (React): <span id="frontend-status" class="status">Verificando...</span></p>
+        <p>Backend (Node.js): <span id="backend-status" class="status">Verificando...</span></p>
+    </div>
+    
+    <div class="debug-box">
+        <h3>🔐 Dados de Autenticação</h3>
+        <p>Token: <span id="token-status">Verificando...</span></p>
+        <p>Usuário: <span id="user-status">Verificando...</span></p>
+    </div>
+    
+    <div class="debug-box">
+        <h3>🏫 Dados de Salas</h3>
+        <p>Salas Admin: <span id="salas-admin">Verificando...</span></p>
+        <p>Alunos Admin: <span id="alunos-admin">Verificando...</span></p>
+    </div>
+    
+    <div class="debug-box">
+        <h3>🔗 Links de Teste</h3>
+        <a href="http://localhost:5173" target="_blank">Frontend React</a> | 
+        <a href="http://localhost:4001" target="_blank">Backend API</a> | 
+        <a href="http://localhost:5173/login" target="_blank">Login</a> | 
+        <a href="http://localhost:5173/sala/1" target="_blank">Sala 1</a>
+    </div>
+    
+    <script>
+        // Verificar status do frontend
+        fetch('http://localhost:5173')
+            .then(response => {
+                const element = document.getElementById('frontend-status');
+                if (response.ok) {
+                    element.textContent = '✅ Online';
+                    element.className = 'status success';
+                } else {
+                    element.textContent = '❌ Erro HTTP';
+                    element.className = 'status error';
+                }
+            })
+            .catch(() => {
+                const element = document.getElementById('frontend-status');
+                element.textContent = '❌ Offline';
+                element.className = 'status error';
+            });
+        
+        // Verificar status do backend
+        fetch('http://localhost:4001')
+            .then(response => {
+                const element = document.getElementById('backend-status');
+                if (response.ok) {
+                    element.textContent = '✅ Online';
+                    element.className = 'status success';
+                } else {
+                    element.textContent = '⚠️ Respondendo';
+                    element.className = 'status warning';
+                }
+            })
+            .catch(() => {
+                const element = document.getElementById('backend-status');
+                element.textContent = '❌ Offline';
+                element.className = 'status error';
+            });
+        
+        // Verificar localStorage
+        try {
+            const token = localStorage.getItem('token');
+            const usuario = localStorage.getItem('usuario');
+            
+            document.getElementById('token-status').textContent = token ? '✅ Presente' : '❌ Ausente';
+            document.getElementById('user-status').textContent = usuario ? '✅ Logado' : '❌ Não logado';
+            
+            const salasAdmin = localStorage.getItem('admin_salas');
+            const alunosAdmin = localStorage.getItem('admin_alunos');
+            
+            document.getElementById('salas-admin').textContent = salasAdmin ? 
+                `✅ ${JSON.parse(salasAdmin).dados?.length || 0} salas` : '❌ Nenhuma';
+            document.getElementById('alunos-admin').textContent = alunosAdmin ? 
+                `✅ ${JSON.parse(alunosAdmin).dados?.length || 0} alunos` : '❌ Nenhum';
+        } catch (error) {
+            console.error('Erro ao verificar localStorage:', error);
+        }
+    </script>
+</body>
+</html>

@@ -379,6 +379,36 @@ export default function Login() {
                 <Chrome className="w-5 h-5 text-blue-500" />
                 <span>Google FaceRec Auth</span>
               </motion.button>
+              
+              {/* Botão Admin Bypass (temporário - DB offline) */}
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                type="button"
+                onClick={() => {
+                  // Criar usuário admin temporário
+                  const adminUser = {
+                    id: 'temp-admin',
+                    email: 'admin@facerec.com',
+                    full_name: 'Administrador (Modo Offline)',
+                    role: 'admin',
+                    tipo: 'administrador',
+                    profile_picture: '',
+                    photoURL: ''
+                  };
+                  
+                  localStorage.setItem("token", `temp-admin-token-${Date.now()}`);
+                  localStorage.setItem("usuario", JSON.stringify(adminUser));
+                  updateUser(adminUser);
+                  
+                  console.log("🔓 Acesso admin temporário ativado");
+                  navigate("/admin");
+                }}
+                className="w-full py-3 px-6 rounded-xl font-semibold transition-all duration-200 text-ai border-2 border-red-300 bg-red-50 hover:bg-red-100 text-red-700 flex items-center justify-center gap-2"
+              >
+                <Shield className="w-5 h-5" />
+                <span>🚨 Admin (Modo Offline)</span>
+              </motion.button>
             </motion.form>
 
             {/* Link para Cadastro */}

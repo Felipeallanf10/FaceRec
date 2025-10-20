@@ -870,7 +870,7 @@ const Administracao = () => {
                   }}
                   className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white min-w-[200px] text-sm"
                 >
-                  <option value="">� Todos os Alunos ({alunos.length})</option>
+                  <option value="">🎓 Todos os Alunos ({alunos.length})</option>
                   {salas.map(sala => {
                     const alunosDaSala = alunos.filter(aluno => aluno.salaId === sala.id);
                     return (

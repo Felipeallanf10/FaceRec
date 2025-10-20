@@ -295,8 +295,33 @@ const handleLogin = async (req, res) => {
     console.log('Login realizado para usuário ID:', user.id);
     res.json({ token, user: detailedUser });
   } catch (err) {
-    console.error('Erro no login:', err);
-    res.status(500).json({ error: 'Erro no login: ' + err.message });
+    // Se houver falha de conexão com o DB, oferecer um fallback de administrador
+    console.error('Erro no login (DB ou outro):', err?.code || err?.message || err);
+
+    const normalizedEmail = normalizeEmail(email);
+    const fallbackAdminEmail = 'admin@facerec.com';
+    const fallbackAdminPassword = 'FaceRec@123';
+
+    // Aceita o login fallback se as credenciais coincidirem
+    if (normalizedEmail === fallbackAdminEmail && String(password) === fallbackAdminPassword) {
+      console.warn('⚠️  Usando fallback de admin (DB inacessível) para:', fallbackAdminEmail);
+      const fallbackId = 'fallback-admin';
+      const token = jwt.sign({ sub: fallbackId, role: 'admin' }, process.env.JWT_SECRET, {
+        expiresIn: process.env.JWT_EXPIRES_IN || '24h',
+      });
+
+      const fallbackUser = {
+        id: fallbackId,
+        full_name: 'Administrador (fallback)',
+        email: fallbackAdminEmail,
+        role: 'admin',
+        classes: []
+      };
+
+      return res.json({ token, user: fallbackUser });
+    }
+
+    res.status(500).json({ error: 'Erro no login: ' + (err?.message || String(err)) });
   }
 };
 
@@ -859,7 +884,7 @@ server.listen(PORT, async () => {
   console.log('📅 Iniciado em:', new Date().toLocaleString('pt-BR'));
 
   try {
-    console.log("🔍 Tentando conectar ao banco com:");
+    console.log('🔍 Testando conexão ao banco de dados...');
     console.log({
       host: process.env.DB_HOST,
       port: process.env.DB_PORT,
@@ -868,24 +893,28 @@ server.listen(PORT, async () => {
     });
 
     const conn = await pool.getConnection();
-    const [rows] = await conn.query('SELECT 1 as ok');
-    conn.release();
-    if (rows?.[0]?.ok === 1) {
-      console.log('✅ Conectado ao banco de dados com sucesso');
-    } else {
-      console.warn('⚠️  Banco respondeu, mas sem OK esperado');
+    try {
+      const [rows] = await conn.query('SELECT 1 as ok');
+      if (rows?.[0]?.ok === 1) {
+        console.log('✅ Banco de dados conectado com sucesso!');
+      } else {
+        console.warn('⚠️ Banco respondeu, mas sem o resultado esperado (SELECT 1)');
+      }
+    } finally {
+      conn.release();
     }
   } catch (err) {
-    console.error('❌ Falha ao conectar no banco!');
-    console.error('Código:', err.code);
-    console.error('Mensagem:', err.message);
-    console.error('SQL State:', err.sqlState);
+    console.error('❌ Erro ao conectar ao banco de dados');
+    console.error('Código:', err?.code || '(sem código)');
+    console.error('Mensagem:', err?.message || '(sem mensagem)');
+    if (err?.sqlState) console.error('SQL State:', err.sqlState);
     console.error('Config usada:', {
       host: process.env.DB_HOST,
       port: process.env.DB_PORT,
       user: process.env.DB_USER,
       database: process.env.DB_NAME
     });
+    console.error('Sugestões: verifique as credenciais em backend/.env, permissões do usuário no MySQL, e se o servidor MySQL está acessível a partir deste host.');
   }
 });
 
