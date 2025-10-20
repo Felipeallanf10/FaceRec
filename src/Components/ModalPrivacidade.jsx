@@ -120,18 +120,7 @@ export default function ModalPrivacidade({ isOpen, onClose }) {
             </section>
 
             <section>
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">6. Retenção de Dados</h3>
-              <div className="text-gray-700">
-                <p>
-                  Mantemos seus dados pelo período necessário para fornecer o serviço 
-                  ou conforme exigido por lei. Dados biométricos são excluídos 
-                  imediatamente após solicitação ou término do vínculo educacional.
-                </p>
-              </div>
-            </section>
-
-            <section>
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">7. Contato</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">6. Contato</h3>
               <div className="bg-gray-50 rounded-lg p-4">
                 <p className="text-gray-700 mb-2">Para questões sobre privacidade:</p>
                 <ul className="text-sm text-gray-600 space-y-1">
