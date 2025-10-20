@@ -54,7 +54,7 @@ export default function ConfigFoto() {
         <div className="text-sm font-medium">Snapshot atual</div>
         <img
           src={currentSrc}
-          alt="Atual"
+          alt="Foto Atual"
           style={{ maxWidth: 320, borderRadius: 8, border: "1px solid #ddd" }}
           onError={(e) => { e.currentTarget.src = `${base}/api/cam/capture?ts=${Date.now()}`; }}
         />

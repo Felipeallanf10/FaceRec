@@ -4,6 +4,8 @@ import api, { apiOrigin, buildUploadsUrl } from "@/lib/api";
 import {
   Image as ImageIcon,
   Upload,
+  Link,
+  Download,
 } from "lucide-react";
 
 /* =========================
@@ -65,6 +67,7 @@ export default function FotoHub() {
 
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState(null); // {type:'ok'|'err', text}
+  const [urlInput, setUrlInput] = useState("");
 
   const fileInputRef = useRef(null);
 
@@ -249,8 +252,9 @@ export default function FotoHub() {
 
 
 
-      {/* Conteúdo - Apenas Galeria */}
-      <div className="space-y-3">
+      {/* Conteúdo - Galeria e URL */}
+      <div className="space-y-4">
+        {/* Upload de Arquivo */}
         <input
           ref={fileInputRef}
           type="file"
@@ -266,6 +270,37 @@ export default function FotoHub() {
           <Upload className="size-4" />
           {busy ? 'Processando...' : 'Selecionar Arquivo'}
         </button>
+        
+        {/* Divisor */}
+        <div className="flex items-center gap-3">
+          <div className="flex-1 h-px bg-slate-200"></div>
+          <span className="text-xs text-slate-500 font-medium">OU</span>
+          <div className="flex-1 h-px bg-slate-200"></div>
+        </div>
+        
+        {/* Campo URL */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-slate-700">Importar de URL</label>
+          <div className="flex items-center gap-3">
+            <Link className="size-5 text-slate-500 flex-shrink-0" />
+            <input
+              type="url"
+              value={urlInput}
+              onChange={(e) => setUrlInput(e.target.value)}
+              placeholder="Cole o link da imagem aqui..."
+              className="flex-1 px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-fuchsia-500 focus:border-fuchsia-500 transition-all duration-200 bg-white"
+            />
+            <button
+              onClick={handleImportUrl}
+              disabled={busy || !urlInput.trim()}
+              className="px-4 py-3 bg-fuchsia-500 text-white rounded-xl hover:bg-fuchsia-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+            >
+              <Download className="size-4" />
+              Importar
+            </button>
+          </div>
+        </div>
+        
         <p className="text-xs text-slate-500 text-center">
           Formatos aceitos: JPG, PNG, WebP, GIF — Máximo 5MB
         </p>

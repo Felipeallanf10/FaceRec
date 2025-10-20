@@ -75,7 +75,7 @@ export default function LiveAttendance() {
         </div>
         {/* Stream MJPEG (ESP32) */}
         <div className="overflow-hidden rounded-xl border">
-          <img src={CAM_STREAM} alt="Live stream" className="w-full object-contain" />
+          <img src={CAM_STREAM} alt="Transmissão ao vivo" className="w-full object-contain" />
         </div>
       </div>
 
