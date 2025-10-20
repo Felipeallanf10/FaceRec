@@ -596,7 +596,7 @@ const Administracao = () => {
                         </p>
                         <p className="text-xs text-blue-700">
                           Selecione uma sala existente para vincular o aluno. Caso não existam salas, 
-                          primeiro crie uma sala na aba "Gerenciar Salas".
+                          primeiro importe uma sala em "Importar CSV".
                         </p>
                       </div>
                     </div>
@@ -916,7 +916,7 @@ const Administracao = () => {
                     </div>
                   ) : salas.length === 0 ? (
                     <p className="text-orange-600 font-medium">
-                      ⚠️ Primeiro crie uma sala na aba "Gerenciar Salas"
+                      ⚠️ Primeiro importe uma sala, em "Importar CSV"
                     </p>
                   ) : (
                     <p className="text-green-600 font-medium">
