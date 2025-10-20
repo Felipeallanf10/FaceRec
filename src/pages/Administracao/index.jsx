@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useUser } from '../../contexts/UserContext';
 import api from '../../lib/api';
 import { Navigate } from 'react-router-dom';
+import FotoHubAluno from '../../Components/FotoHubAluno';
 import { 
   Users, 
   School, 
@@ -35,6 +36,7 @@ const Administracao = () => {
   const fileInputRef = useRef(null);
   const [importResumo, setImportResumo] = useState(null);
   const [importingToServer, setImportingToServer] = useState(false);
+  const [showFotoHub, setShowFotoHub] = useState(false);
 
   // Estados dos dados
   const [alunos, setAlunos] = useState([]);
@@ -618,13 +620,15 @@ const Administracao = () => {
                       </div>
                     )}
                   </div>
-                  <div className="flex gap-3 justify-center">
+                  
+                  {/* Botões de controle de foto */}
+                  <div className="flex gap-3 justify-center mb-4">
                     <button 
-                      onClick={handlePhotoUpload}
+                      onClick={() => setShowFotoHub(!showFotoHub)}
                       className="text-blue-600 hover:text-blue-700 text-sm font-medium transition-colors"
                     >
                       <Upload className="w-4 h-4 inline mr-1" />
-                      {editingItem?.foto ? 'Trocar Foto' : 'Adicionar Foto'}
+                      {showFotoHub ? 'Fechar Editor' : 'Configurar Foto'}
                     </button>
                     {editingItem?.foto && (
                       <button 
@@ -636,6 +640,16 @@ const Administracao = () => {
                       </button>
                     )}
                   </div>
+
+                  {/* FotoHub integrado */}
+                  {showFotoHub && (
+                    <div className="mb-6">
+                      <FotoHubAluno 
+                        currentPhoto={editingItem?.foto}
+                        onPhotoChange={(newPhoto) => setEditingItem(prev => ({...prev, foto: newPhoto}))}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Campos do Aluno */}
