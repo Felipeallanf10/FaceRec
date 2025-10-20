@@ -148,40 +148,7 @@ const Administracao = () => {
     setShowModal(true);
   };
 
-  // Função para upload de foto do aluno
-  const handlePhotoUpload = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.onchange = (e) => {
-      const file = e.target.files?.[0];
-      if (file) {
-        // Verificar se é uma imagem
-        if (!file.type.startsWith('image/')) {
-          alert('❌ Por favor, selecione apenas arquivos de imagem (JPG, PNG, GIF, etc.)');
-          return;
-        }
-        
-        // Verificar tamanho do arquivo (máximo 5MB)
-        if (file.size > 5 * 1024 * 1024) {
-          alert('❌ A imagem deve ter no máximo 5MB');
-          return;
-        }
-        
-        // Converter para base64 e atualizar o estado
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const base64String = event.target.result;
-          setEditingItem(prev => ({
-            ...prev,
-            foto: base64String
-          }));
-        };
-        reader.readAsDataURL(file);
-      }
-    };
-    input.click();
-  };
+
 
   const handleSaveAluno = async () => {
     // Validações obrigatórias
@@ -646,7 +613,10 @@ const Administracao = () => {
                     <div className="mb-6">
                       <FotoHubAluno 
                         currentPhoto={editingItem?.foto}
-                        onPhotoChange={(newPhoto) => setEditingItem(prev => ({...prev, foto: newPhoto}))}
+                        onPhotoChange={(newPhoto) => {
+                          console.log('📸 FotoHub: Nova foto recebida, tamanho:', newPhoto?.length || 'null');
+                          setEditingItem(prev => ({...prev, foto: newPhoto}));
+                        }}
                       />
                     </div>
                   )}
