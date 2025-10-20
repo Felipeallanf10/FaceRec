@@ -1,12 +1,8 @@
-import { useMemo, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   Image as ImageIcon,
   Upload,
 } from "lucide-react";
-
-/* =========================
-   FotoHub adaptado para Alunos na Administração
-   ========================= */
 
 export default function FotoHubAluno({ currentPhoto, onPhotoChange }) {
   const [message, setMessage] = useState(null);
@@ -21,54 +17,61 @@ export default function FotoHubAluno({ currentPhoto, onPhotoChange }) {
     setTimeout(() => setMessage(null), 4000);
   };
 
-  // Função para converter arquivo/blob em base64 e aplicar
-  const applyPhotoFromBlob = async (blob, filename = "photo.png") => {
-    try {
-      console.log('📷 Convertendo arquivo para base64:', filename);
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const base64String = event.target.result;
-        console.log('✅ Base64 gerado, tamanho:', base64String.length);
-        console.log('🔄 Chamando onPhotoChange...');
-        onPhotoChange(base64String);
-        showMsg("ok", "Foto aplicada com sucesso!");
-      };
-      reader.onerror = (error) => {
-        console.error('❌ Erro ao ler arquivo:', error);
-        showMsg("err", "Erro ao ler arquivo");
-      };
-      reader.readAsDataURL(blob);
-    } catch (err) {
-      console.error('❌ Erro ao processar imagem:', err);
-      showMsg("err", "Erro ao processar imagem");
-    }
-  };
-
-  // Upload de arquivo local
-  const handleUploadLocal = async (e) => {
+  // Upload de arquivo local - versão simplificada
+  const handleFileChange = (e) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file) {
+      console.log('❌ Nenhum arquivo selecionado');
+      return;
+    }
 
-    console.log('📸 Arquivo selecionado:', file.name, file.type, file.size);
+    console.log('📸 Arquivo selecionado:', {
+      name: file.name,
+      type: file.type,
+      size: file.size
+    });
 
-    // Validações
+    // Validações básicas
     if (!file.type.startsWith('image/')) {
       console.error('❌ Tipo de arquivo inválido:', file.type);
-      showMsg("err", "Por favor, selecione apenas arquivos de imagem");
+      alert('Por favor, selecione apenas arquivos de imagem');
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
       console.error('❌ Arquivo muito grande:', file.size);
-      showMsg("err", "A imagem deve ter no máximo 5MB");
+      alert('A imagem deve ter no máximo 5MB');
       return;
     }
 
-    console.log('✅ Arquivo válido, processando...');
+    console.log('✅ Arquivo válido, convertendo para base64...');
     setBusy(true);
-    await applyPhotoFromBlob(file, file.name);
-    setBusy(false);
-    e.target.value = "";
+    
+    // Converter para base64
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64String = event.target.result;
+      console.log('✅ Base64 gerado, tamanho:', base64String?.length || 'null');
+      
+      if (onPhotoChange && base64String) {
+        console.log('🔄 Chamando onPhotoChange...');
+        onPhotoChange(base64String);
+        showMsg("ok", "Foto carregada com sucesso!");
+      } else {
+        console.error('❌ onPhotoChange não definido ou base64 vazio');
+        showMsg("err", "Erro: callback não definido");
+      }
+      
+      setBusy(false);
+    };
+    
+    reader.onerror = (error) => {
+      console.error('❌ Erro ao ler arquivo:', error);
+      showMsg("err", "Erro ao ler arquivo");
+      setBusy(false);
+    };
+    
+    reader.readAsDataURL(file);
   };
 
 
@@ -108,27 +111,34 @@ export default function FotoHubAluno({ currentPhoto, onPhotoChange }) {
       </div>
 
       {/* Conteúdo - Apenas Galeria */}
-      <div className="space-y-2">
+      <div className="space-y-3">
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/jpeg,image/jpg,image/png,image/webp"
+          accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
           className="hidden"
-          onChange={handleUploadLocal}
+          onChange={handleFileChange}
         />
         <button
+          type="button"
           onClick={() => {
-            console.log('🖱️ Botão "Selecionar arquivo" clicado');
-            console.log('📎 fileInputRef.current:', fileInputRef.current);
-            fileInputRef.current?.click();
+            console.log('🖱️ Botão clicado');
+            console.log('📎 Input ref:', fileInputRef.current);
+            if (fileInputRef.current) {
+              fileInputRef.current.click();
+            } else {
+              console.error('❌ Input ref não encontrado');
+            }
           }}
           disabled={busy}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-50 w-full sm:w-auto"
+          className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           <Upload className="size-4" />
-          {busy ? 'Processando...' : 'Selecionar arquivo'}
+          {busy ? 'Processando...' : 'Selecionar Arquivo'}
         </button>
-        <p className="text-xs text-slate-500">JPG, PNG ou WebP — até 5MB</p>
+        <p className="text-xs text-slate-500 text-center">
+          Formatos aceitos: JPG, PNG, WebP, GIF — Máximo 5MB
+        </p>
       </div>
     </div>
   );
