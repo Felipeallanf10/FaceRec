@@ -370,7 +370,7 @@ export default function Configuracoes() {
                           ? "border-indigo-300 bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
                           : "border-slate-200 bg-slate-50 text-slate-600"
                       }`}
-                      placeholder="(11) 99999-9999"
+                      placeholder="(19)98184-6601"
                     />
                   </div>
                   <button

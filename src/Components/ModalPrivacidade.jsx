@@ -135,9 +135,9 @@ export default function ModalPrivacidade({ isOpen, onClose }) {
               <div className="bg-gray-50 rounded-lg p-4">
                 <p className="text-gray-700 mb-2">Para questões sobre privacidade:</p>
                 <ul className="text-sm text-gray-600 space-y-1">
-                  <li><strong>Email:</strong> privacidade@facerec.com</li>
-                  <li><strong>Telefone:</strong> (11) 9999-9999</li>
-                  <li><strong>Endereço:</strong> Rua da Tecnologia, 123 - São Paulo, SP</li>
+                  <li><strong>Email:</strong> julia.rossin@eaportal.org</li>
+                  <li><strong>Telefone:</strong> (19)98184-6601</li>
+                  <li><strong>Endereço:</strong> unasp-ec</li>
                 </ul>
               </div>
             </section>

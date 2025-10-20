@@ -83,7 +83,7 @@ export default function ModalSuporte({ isOpen, onClose }) {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <p className="font-mono text-lg text-blue-700">(11) 9999-8888</p>
+                    <p className="font-mono text-lg text-blue-700">(19)98184-6601</p>
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                       <Clock className="w-4 h-4" />
                       <span>Segunda a Sexta: 8h às 18h</span>
@@ -102,7 +102,7 @@ export default function ModalSuporte({ isOpen, onClose }) {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <p className="font-mono text-purple-700">suporte@facerec.com</p>
+                    <p className="font-mono text-purple-700">julia.rossin@eaportal.org</p>
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                       <Clock className="w-4 h-4" />
                       <span>Resposta em até 24 horas</span>
@@ -150,7 +150,7 @@ export default function ModalSuporte({ isOpen, onClose }) {
                 </div>
                 <p className="text-sm text-red-600">
                   Para problemas críticos que impedem o funcionamento do sistema: 
-                  <span className="font-mono ml-2">(11) 9999-0000</span> (24h)
+                  <span className="font-mono ml-2">(19)98184-6601</span> (24h)
                 </p>
               </div>
             </div>

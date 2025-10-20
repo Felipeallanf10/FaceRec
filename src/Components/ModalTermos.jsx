@@ -240,9 +240,9 @@ export default function ModalTermos({ isOpen, onClose }) {
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
                     <h4 className="font-semibold text-gray-800 mb-2">📧 Questões Legais:</h4>
-                    <ul className="text-sm text-gray-700 space-y-1">
-                      <li><strong>Email:</strong> juridico@facerec.com</li>
-                      <li><strong>Telefone:</strong> (11) 9999-7777</li>
+                    <ul className="text-sm text-gray-600 space-y-1">
+                      <li><strong>Email:</strong> julia.rossin@eaportal.org</li>
+                      <li><strong>Telefone:</strong> (19)98184-6601</li>
                       <li><strong>Horário:</strong> Seg-Sex, 9h às 17h</li>
                     </ul>
                   </div>
@@ -250,7 +250,7 @@ export default function ModalTermos({ isOpen, onClose }) {
                     <h4 className="font-semibold text-gray-800 mb-2">⚖️ Jurisdição:</h4>
                     <p className="text-sm text-gray-700">
                       Este acordo é regido pelas leis brasileiras. 
-                      Foro da comarca de São Paulo/SP para resolver disputas.
+                      Foro de unasp-ec para resolver disputas.
                     </p>
                   </div>
                 </div>
