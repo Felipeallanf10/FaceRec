@@ -16,64 +16,13 @@ import { useNavigate } from 'react-router-dom';
 const Alunos = () => {
   const navigate = useNavigate();
   const [salas, setSalas] = useState([]);
+  const [modalChamada, setModalChamada] = useState({ aberto: false, sala: null, alunos: [] });
 
-  // Dados padrão (mock) - usados se o admin não tiver criado salas
-  const salasMock = [
-    {
-      id: 1,
-      nome: "1º Ano A",
-      turma: "Ensino Médio",
-      totalAlunos: 32,
-      periodo: "Manhã",
-      professor: "Prof. Maria Silva"
-    },
-    {
-      id: 2,
-      nome: "1º Ano B", 
-      turma: "Ensino Médio",
-      totalAlunos: 28,
-      periodo: "Manhã",
-      professor: "Prof. João Santos"
-    },
-    {
-      id: 3,
-      nome: "2º Ano A",
-      turma: "Ensino Médio", 
-      totalAlunos: 30,
-      periodo: "Tarde",
-      professor: "Prof. Ana Costa"
-    },
-    {
-      id: 4,
-      nome: "2º Ano B",
-      turma: "Ensino Médio",
-      totalAlunos: 25,
-      periodo: "Tarde", 
-      professor: "Prof. Carlos Lima"
-    },
-    {
-      id: 5,
-      nome: "3º Ano A",
-      turma: "Ensino Médio",
-      totalAlunos: 29,
-      periodo: "Manhã",
-      professor: "Prof. Lucia Ferreira"
-    },
-    {
-      id: 6,
-      nome: "3º Ano B",
-      turma: "Ensino Médio",
-      totalAlunos: 27,
-      periodo: "Tarde",
-      professor: "Prof. Roberto Souza"
-    }
-  ];
-
-  // Carregar dados do administrador ou usar dados mock
+  // Carregar dados do administrador - apenas salas importadas via CSV
   useEffect(() => {
     const carregarSalas = () => {
       try {
-        // Tentar carregar salas criadas pelo admin
+        // Tentar carregar salas criadas pelo admin via importação CSV
         const salasAdmin = localStorage.getItem('admin_salas');
         const alunosAdmin = localStorage.getItem('admin_alunos');
         
@@ -93,19 +42,19 @@ const Alunos = () => {
               totalAlunos: alunosSalvos.filter(aluno => aluno.salaId === sala.id).length || sala.totalAlunos || 0
             }));
             
-            console.log('✅ Carregadas salas do administrador:', salasComContagem);
+            console.log('✅ Carregadas salas importadas via CSV:', salasComContagem);
             setSalas(salasComContagem);
             return;
           }
         }
         
-        // Se não há salas do admin, usar dados mock
-        console.log('📝 Usando salas padrão (mock)');
-        setSalas(salasMock);
+        // Se não há salas importadas, mostrar lista vazia
+        console.log('📝 Nenhuma sala importada via CSV encontrada');
+        setSalas([]);
         
       } catch (error) {
         console.error('❌ Erro ao carregar salas:', error);
-        setSalas(salasMock);
+        setSalas([]);
       }
     };
     
@@ -118,6 +67,83 @@ const Alunos = () => {
    */
   const acessarSala = (salaId) => {
     navigate(`/sala/${salaId}`);
+  };
+
+  /**
+   * Função para abrir modal de chamada manual
+   * @param {object} sala - Dados da sala selecionada
+   */
+  const abrirChamadaManual = (sala) => {
+    // Carregar alunos da sala
+    const alunosAdmin = localStorage.getItem('admin_alunos');
+    let alunosDaSala = [];
+    
+    if (alunosAdmin) {
+      const { dados: alunosData } = JSON.parse(alunosAdmin);
+      alunosDaSala = alunosData.filter(aluno => aluno.salaId === sala.id);
+    }
+
+    setModalChamada({
+      aberto: true,
+      sala: sala,
+      alunos: alunosDaSala.map(aluno => ({
+        ...aluno,
+        presente: false // Estado inicial: todos ausentes
+      }))
+    });
+  };
+
+  /**
+   * Função para fechar modal de chamada manual e voltar para home
+   */
+  const fecharChamadaManual = () => {
+    setModalChamada({ aberto: false, sala: null, alunos: [] });
+    navigate('/'); // Redireciona para a home page
+  };
+
+  /**
+   * Função para alternar presença de um aluno
+   */
+  const alternarPresenca = (alunoId) => {
+    setModalChamada(prev => ({
+      ...prev,
+      alunos: prev.alunos.map(aluno => 
+        aluno.id === alunoId 
+          ? { ...aluno, presente: !aluno.presente }
+          : aluno
+      )
+    }));
+  };
+
+  /**
+   * Função para salvar a chamada manual
+   */
+  const salvarChamada = () => {
+    const presencas = modalChamada.alunos.filter(aluno => aluno.presente);
+    const ausencias = modalChamada.alunos.filter(aluno => !aluno.presente);
+    
+    // Salvar registro de chamada no localStorage
+    const registroChamada = {
+      sala: modalChamada.sala.nome,
+      salaId: modalChamada.sala.id,
+      data: new Date().toISOString(),
+      tipo: 'manual',
+      presencas: presencas.length,
+      ausencias: ausencias.length,
+      alunos: modalChamada.alunos.map(aluno => ({
+        nome: aluno.nome,
+        matricula: aluno.matricula,
+        presente: aluno.presente
+      }))
+    };
+
+    // Recuperar chamadas existentes
+    const chamadasExistentes = JSON.parse(localStorage.getItem('chamadas_realizadas') || '[]');
+    chamadasExistentes.push(registroChamada);
+    localStorage.setItem('chamadas_realizadas', JSON.stringify(chamadasExistentes));
+
+    alert(`Chamada salva com sucesso!\nPresentes: ${presencas.length}\nAusentes: ${ausencias.length}`);
+    fecharChamadaManual();
   };
 
   /**
@@ -172,8 +198,8 @@ const Alunos = () => {
 
           {/* Botão Secundário - Chamada Manual */}
           <button
-            onClick={() => navigate(`/sala/${sala.id}/manual`)}
-            className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center space-x-2"
+            onClick={() => abrirChamadaManual(sala)}
+            className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center space-x-2"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
@@ -234,12 +260,40 @@ const Alunos = () => {
 
       {/* Conteúdo Principal */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Grid de Salas */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {salas.map((sala) => (
-            <CardSala key={sala.id} sala={sala} />
-          ))}
-        </div>
+        {/* Grid de Salas ou Mensagem de Estado Vazio */}
+        {salas.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {salas.map((sala) => (
+              <CardSala key={sala.id} sala={sala} />
+            ))}
+          </div>
+        ) : (
+          /* Mensagem quando não há salas importadas */
+          <div className="text-center py-16">
+            <div className="max-w-md mx-auto">
+              <div className="w-20 h-20 mx-auto mb-6 bg-gray-100 rounded-full flex items-center justify-center">
+                <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">
+                Nenhuma sala de aula encontrada
+              </h3>
+              <p className="text-gray-600 mb-6">
+                As salas de aula aparecerão aqui após a importação do arquivo CSV com os dados dos alunos.
+              </p>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-left">
+                <h4 className="font-semibold text-blue-900 mb-2">Como importar dados:</h4>
+                <ol className="text-sm text-blue-800 space-y-1">
+                  <li>1. Acesse a página de Administração</li>
+                  <li>2. Clique em "Importar CSV"</li>
+                  <li>3. Selecione o arquivo com dados dos alunos</li>
+                  <li>4. As salas aparecerão automaticamente aqui</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Seção de Informações do Sistema */}
         <div className="mt-12 bg-gradient-to-r from-blue-50 to-green-50 border border-blue-200 rounded-xl p-6">
@@ -276,7 +330,7 @@ const Alunos = () => {
                 
                 <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                   <p className="text-yellow-800 text-sm">
-                    💡 <strong>Dica:</strong> Se a câmera falhar, use o botão "Chamada Manual" como backup para marcar presenças individualmente.
+                    💡 <strong>Dica:</strong> O sistema utiliza inteligência artificial para reconhecer rostos e marcar presenças automaticamente.
                   </p>
                 </div>
               </div>
@@ -302,6 +356,92 @@ const Alunos = () => {
           </div>
         </div>
       </div>
+
+      {/* Modal de Chamada Manual */}
+      {modalChamada.aberto && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Header do Modal */}
+            <div className="bg-green-600 text-white p-6">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-xl font-bold">Chamada Manual</h2>
+                  <p className="text-green-100">{modalChamada.sala?.nome} - {modalChamada.sala?.periodo}</p>
+                </div>
+                <button
+                  onClick={fecharChamadaManual}
+                  className="text-white hover:text-red-200 transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Lista de Alunos */}
+            <div className="flex-1 p-6 overflow-y-auto">
+              {modalChamada.alunos.length > 0 ? (
+                <div className="space-y-2">
+                  {modalChamada.alunos.map((aluno, index) => (
+                    <div
+                      key={aluno.id || index}
+                      className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
+                        aluno.presente 
+                          ? 'bg-green-50 border-green-200' 
+                          : 'bg-gray-50 border-gray-200'
+                      }`}
+                    >
+                      <div className="flex-1">
+                        <p className="font-medium text-gray-800">{aluno.nome}</p>
+                        <p className="text-sm text-gray-500">Matrícula: {aluno.matricula}</p>
+                      </div>
+                      <button
+                        onClick={() => alternarPresenca(aluno.id || index)}
+                        className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                          aluno.presente
+                            ? 'bg-green-600 text-white hover:bg-green-700'
+                            : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
+                        }`}
+                      >
+                        {aluno.presente ? 'Presente' : 'Ausente'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">Nenhum aluno encontrado nesta sala.</p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer do Modal */}
+            <div className="flex-shrink-0 bg-gray-50 px-6 py-4 flex justify-between items-center border-t">
+              <div className="text-sm text-gray-600">
+                <span className="font-medium text-green-600">
+                  {modalChamada.alunos.filter(a => a.presente).length}
+                </span>
+                {' '}presentes de {modalChamada.alunos.length} alunos
+              </div>
+              <div className="flex space-x-3">
+                <button
+                  onClick={fecharChamadaManual}
+                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors font-medium"
+                >
+                  Sair
+                </button>
+                <button
+                  onClick={salvarChamada}
+                  className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
+                >
+                  Salvar Chamada
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -16,7 +16,8 @@ import {
   Lock,
   Mail,
   Chrome,
-  Camera
+  Camera,
+  ArrowLeft
 } from "lucide-react";
 
 export default function Login() {
@@ -82,6 +83,7 @@ export default function Login() {
 
   // Credenciais de desenvolvimento/teste
   const credenciaisMock = {
+    'admin@facerec.com': { senha: 'FaceRec@123', role: 'admin', nome: 'Administrador FaceRec' },
     'admin@escola.com': { senha: '123456', role: 'admin', nome: 'Administrador Sistema' },
     'administrador@escola.com': { senha: '123456', role: 'admin', nome: 'Administrador FaceRec' },
     'professor@escola.com': { senha: '123456', role: 'professor', nome: 'Professor Silva' },
@@ -285,51 +287,53 @@ export default function Login() {
             >
               
               {/* Campo Email */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700 text-ai">Email FaceRec</label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Mail className="h-5 w-5" style={{color: '#e4a576'}} />
+              <div>
+                <div className="flex items-center gap-3">
+                  <Mail className="h-5 w-5 text-slate-500 flex-shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <label className="text-sm font-medium text-slate-700 text-ai">Email FaceRec</label>
+                    <input
+                      type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleChange}
+                      required
+                      placeholder=""
+                      className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200 text-ai bg-white/80"
+                    />
                   </div>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    required
-                    placeholder=""
-                    className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200 text-ai bg-white/80"
-                  />
                 </div>
               </div>
 
               {/* Campo Senha */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700 text-ai">Senha de Acesso</label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Lock className="h-5 w-5" style={{color: '#e4a576'}} />
+              <div>
+                <div className="flex items-center gap-3">
+                  <Lock className="h-5 w-5 text-slate-500 flex-shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <label className="text-sm font-medium text-slate-700 text-ai">Senha de Acesso</label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        name="password"
+                        value={formData.password}
+                        onChange={handleChange}
+                        required
+                        placeholder=""
+                        className="w-full px-4 py-3 pr-12 border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200 text-ai bg-white/80"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-5 w-5 text-slate-500" />
+                        ) : (
+                          <Eye className="h-5 w-5 text-slate-500" />
+                        )}
+                      </button>
+                    </div>
                   </div>
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    name="password"
-                    value={formData.password}
-                    onChange={handleChange}
-                    required
-                    placeholder=""
-                    className="w-full pl-10 pr-12 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200 text-ai bg-white/80"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-5 w-5" style={{color: '#e4a576'}} />
-                    ) : (
-                      <Eye className="h-5 w-5" style={{color: '#e4a576'}} />
-                    )}
-                  </button>
                 </div>
               </div>
 
@@ -378,24 +382,68 @@ export default function Login() {
                 <Chrome className="w-5 h-5 text-blue-500" />
                 <span>Google FaceRec Auth</span>
               </motion.button>
+              
+              {/* Botão Admin Bypass (temporário - DB offline) */}
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                type="button"
+                onClick={() => {
+                  // Criar usuário admin temporário
+                  const adminUser = {
+                    id: 'temp-admin',
+                    email: 'admin@facerec.com',
+                    full_name: 'Administrador (Modo Offline)',
+                    role: 'admin',
+                    tipo: 'administrador',
+                    profile_picture: '',
+                    photoURL: ''
+                  };
+                  
+                  localStorage.setItem("token", `temp-admin-token-${Date.now()}`);
+                  localStorage.setItem("usuario", JSON.stringify(adminUser));
+                  updateUser(adminUser);
+                  
+                  console.log("🔓 Acesso admin temporário ativado");
+                  navigate("/admin");
+                }}
+                className="w-full py-3 px-6 rounded-xl font-semibold transition-all duration-200 text-ai border-2 border-red-300 bg-red-50 hover:bg-red-100 text-red-700 flex items-center justify-center gap-2"
+              >
+                <Shield className="w-5 h-5" />
+                <span>🚨 Admin (Modo Offline)</span>
+              </motion.button>
             </motion.form>
 
-            {/* Link para Cadastro */}
+            {/* Botões de Navegação */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.8, duration: 0.6 }}
-              className="mt-8 text-center"
+              className="mt-8 space-y-4"
             >
-              <p className="text-slate-600 text-ai">
-                Não possui acesso FaceRec?{" "}
+              {/* Botão Voltar para Homepage */}
+              <div className="text-center">
                 <Link
-                  to="/cadastro"
-                  className="font-semibold text-blue-600 hover:text-blue-700 transition-colors"
+                  to="/"
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 transition-colors"
                 >
-                  Registrar no Sistema
+                  <ArrowLeft className="w-4 h-4" />
+                  Voltar para Homepage
                 </Link>
-              </p>
+              </div>
+              
+              {/* Link para Cadastro */}
+              <div className="text-center">
+                <p className="text-slate-600 text-ai">
+                  Não possui acesso FaceRec?{" "}
+                  <Link
+                    to="/cadastro"
+                    className="font-semibold text-blue-600 hover:text-blue-700 transition-colors"
+                  >
+                    Registrar no Sistema
+                  </Link>
+                </p>
+              </div>
             </motion.div>
 
           </div>

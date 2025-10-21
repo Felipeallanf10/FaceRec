@@ -100,7 +100,7 @@ export default function MockCamControls() {
       <div className="mt-3">
         <span className="text-sm text-slate-600">Snapshot atual:</span>
         <div className="mt-2 border rounded-lg p-2">
-          <img src={`${CAM_BASE}/api/cam/capture?t=${Date.now()}`} alt="snapshot atual" className="w-full max-w-sm rounded" />
+          <img src={`${CAM_BASE}/api/cam/capture?t=${Date.now()}`} alt="foto atual" className="w-full max-w-sm rounded" />
         </div>
       </div>
     </div>

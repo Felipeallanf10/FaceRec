@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, HelpCircle, Phone, Mail, MessageCircle, Clock, CheckCircle, AlertTriangle, Bug } from 'lucide-react';
+import { X, Users, Phone, Mail, MessageCircle, Clock, CheckCircle, AlertTriangle, Bug } from 'lucide-react';
 
 export default function ModalSuporte({ isOpen, onClose }) {
   const [activeTab, setActiveTab] = useState('contato');
@@ -28,7 +28,7 @@ export default function ModalSuporte({ isOpen, onClose }) {
           <div className="flex items-center justify-between text-white">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
-                <HelpCircle className="w-5 h-5" />
+                <Users className="w-5 h-5" />
               </div>
               <div>
                 <h2 className="text-xl font-bold">Central de Suporte</h2>
@@ -47,7 +47,7 @@ export default function ModalSuporte({ isOpen, onClose }) {
           <div className="flex gap-4 mt-6">
             {[
               { id: 'contato', label: 'Contato', icon: Phone },
-              { id: 'faq', label: 'FAQ', icon: HelpCircle },
+              { id: 'faq', label: 'FAQ', icon: Users },
               { id: 'ticket', label: 'Abrir Ticket', icon: MessageCircle }
             ].map(({ id, label, icon: Icon }) => (
               <button
@@ -83,7 +83,7 @@ export default function ModalSuporte({ isOpen, onClose }) {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <p className="font-mono text-lg text-blue-700">(11) 9999-8888</p>
+                    <p className="font-mono text-lg text-blue-700">(19)98184-6601</p>
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                       <Clock className="w-4 h-4" />
                       <span>Segunda a Sexta: 8h às 18h</span>
@@ -102,7 +102,7 @@ export default function ModalSuporte({ isOpen, onClose }) {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <p className="font-mono text-purple-700">suporte@facerec.ai</p>
+                    <p className="font-mono text-purple-700">julia.rossin@eaportal.org</p>
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                       <Clock className="w-4 h-4" />
                       <span>Resposta em até 24 horas</span>
@@ -150,7 +150,7 @@ export default function ModalSuporte({ isOpen, onClose }) {
                 </div>
                 <p className="text-sm text-red-600">
                   Para problemas críticos que impedem o funcionamento do sistema: 
-                  <span className="font-mono ml-2">(11) 9999-0000</span> (24h)
+                  <span className="font-mono ml-2">(19)98184-6601</span> (24h)
                 </p>
               </div>
             </div>

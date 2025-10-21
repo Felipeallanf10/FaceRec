@@ -299,18 +299,18 @@ export default function Configuracoes() {
             <div className="space-y-6">
               {/* Nome */}
               <div>
-                <label className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                  <User className="size-4" />
+                <label className="text-sm font-semibold text-slate-700 mb-3">
                   {obterLabelCampo("full_name")} *
                 </label>
                 <div className="flex items-center space-x-3">
-                  <div className="flex-1 relative">
+                  <div className="flex items-center gap-3 flex-1">
+                    <User className="size-5 text-slate-500 flex-shrink-0" />
                     <input
                       type="text"
                       value={safeUsuario.full_name || ""}
                       disabled={!camposEditaveis.full_name}
                       onChange={(e) => setUsuario({ ...(usuario || {}), full_name: e.target.value })}
-                      className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-300 ${
+                      className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all duration-300 ${
                         camposEditaveis.full_name
                           ? "border-indigo-300 bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
                           : "border-slate-200 bg-slate-50 text-slate-600"
@@ -334,19 +334,21 @@ export default function Configuracoes() {
 
               {/* Email */}
               <div>
-                <label className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                  <Mail className="size-4" />
+                <label className="text-sm font-semibold text-slate-700 mb-3">
                   Email *
                 </label>
-                <div className="flex-1 relative">
-                  <input
-                    type="email"
-                    value={safeUsuario.email || ""}
-                    disabled
-                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-slate-50 text-slate-600"
-                  />
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                    <Lock className="size-4 text-slate-400" />
+                <div className="flex items-center gap-3">
+                  <Mail className="size-5 text-slate-500 flex-shrink-0" />
+                  <div className="flex-1 relative">
+                    <input
+                      type="email"
+                      value={safeUsuario.email || ""}
+                      disabled
+                      className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-slate-50 text-slate-600"
+                    />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <Lock className="size-4 text-slate-400" />
+                    </div>
                   </div>
                 </div>
                 <p className="text-xs text-slate-500 mt-2">Email não pode ser alterado</p>
@@ -354,23 +356,23 @@ export default function Configuracoes() {
 
               {/* Telefone */}
               <div>
-                <label className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                  <Phone className="size-4" />
+                <label className="text-sm font-semibold text-slate-700 mb-3">
                   Telefone
                 </label>
                 <div className="flex items-center space-x-3">
-                  <div className="flex-1 relative">
+                  <div className="flex items-center gap-3 flex-1">
+                    <Phone className="size-5 text-slate-500 flex-shrink-0" />
                     <input
                       type="text"
                       value={safeUsuario.phone || ""}
                       disabled={!camposEditaveis.phone}
                       onChange={(e) => setUsuario({ ...(usuario || {}), phone: e.target.value })}
-                      className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-300 ${
+                      className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all duration-300 ${
                         camposEditaveis.phone
                           ? "border-indigo-300 bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
                           : "border-slate-200 bg-slate-50 text-slate-600"
                       }`}
-                      placeholder="(11) 99999-9999"
+                      placeholder="(19)98184-6601"
                     />
                   </div>
                   <button
@@ -389,18 +391,18 @@ export default function Configuracoes() {
 
               {/* CPF */}
               <div>
-                <label className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                  <CreditCard className="size-4" />
+                <label className="text-sm font-semibold text-slate-700 mb-3">
                   CPF
                 </label>
                 <div className="flex items-center space-x-3">
-                  <div className="flex-1 relative">
+                  <div className="flex items-center gap-3 flex-1">
+                    <CreditCard className="size-5 text-slate-500 flex-shrink-0" />
                     <input
                       type="text"
                       value={safeUsuario.cpf || ""}
                       disabled={!camposEditaveis.cpf}
                       onChange={(e) => setUsuario({ ...(usuario || {}), cpf: e.target.value })}
-                      className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-300 ${
+                      className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all duration-300 ${
                         camposEditaveis.cpf
                           ? "border-indigo-300 bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
                           : "border-slate-200 bg-slate-50 text-slate-600"
@@ -424,18 +426,18 @@ export default function Configuracoes() {
 
               {/* Matéria */}
               <div>
-                <label className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                  <GraduationCap className="size-4" />
+                <label className="text-sm font-semibold text-slate-700 mb-3 block">
                   Matéria que leciona
                 </label>
                 <div className="flex items-center space-x-3">
-                  <div className="flex-1 relative">
+                  <div className="flex-1 flex items-center gap-3">
+                    <GraduationCap className="size-5 text-slate-500 flex-shrink-0" />
                     <input
                       type="text"
                       value={safeUsuario.subject || ""}
                       disabled={!camposEditaveis.subject}
                       onChange={(e) => setUsuario({ ...(usuario || {}), subject: e.target.value })}
-                      className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-300 ${
+                      className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all duration-300 ${
                         camposEditaveis.subject
                           ? "border-indigo-300 bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
                           : "border-slate-200 bg-slate-50 text-slate-600"
@@ -459,18 +461,18 @@ export default function Configuracoes() {
 
               {/* Escola */}
               <div>
-                <label className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                  <Building2 className="size-4" />
+                <label className="text-sm font-semibold text-slate-700 mb-3 block">
                   Escola
                 </label>
                 <div className="flex items-center space-x-3">
-                  <div className="flex-1 relative">
+                  <div className="flex-1 flex items-center gap-3">
+                    <Building2 className="size-5 text-slate-500 flex-shrink-0" />
                     <input
                       type="text"
                       value={safeUsuario.school || ""}
                       disabled={!camposEditaveis.school}
                       onChange={(e) => setUsuario({ ...(usuario || {}), school: e.target.value })}
-                      className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-300 ${
+                      className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all duration-300 ${
                         camposEditaveis.school
                           ? "border-indigo-300 bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
                           : "border-slate-200 bg-slate-50 text-slate-600"
@@ -494,27 +496,29 @@ export default function Configuracoes() {
 
               {/* Turmas */}
               <div>
-                <label className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                  <Users className="size-4" />
+                <label className="text-sm font-semibold text-slate-700 mb-3 block">
                   Turmas atribuídas
                 </label>
                 <div className="flex items-start space-x-3">
-                  <div className="flex-1 relative">
-                    <textarea
-                      value={classesInput}
-                      disabled={!camposEditaveis.classes}
-                      onChange={(e) => {
-                        const raw = e.target.value;
-                        setClassesInput(raw);
-                      }}
-                      className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-300 min-h-[80px] ${
-                        camposEditaveis.classes
-                          ? "border-indigo-300 bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
-                          : "border-slate-200 bg-slate-50 text-slate-600"
-                      }`}
-                      placeholder="Separe por vírgulas, ex: 1ºA, 1ºB, 2ºA"
-                    />
-                    <p className="text-xs text-slate-500 mt-2">Utilize vírgulas para separar as turmas.</p>
+                  <div className="flex-1 flex items-start gap-3">
+                    <Users className="size-5 text-slate-500 flex-shrink-0 mt-3" />
+                    <div className="flex-1">
+                      <textarea
+                        value={classesInput}
+                        disabled={!camposEditaveis.classes}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          setClassesInput(raw);
+                        }}
+                        className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-300 min-h-[80px] ${
+                          camposEditaveis.classes
+                            ? "border-indigo-300 bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                            : "border-slate-200 bg-slate-50 text-slate-600"
+                        }`}
+                        placeholder="Separe por vírgulas, ex: 1ºA, 1ºB, 2ºA"
+                      />
+                      <p className="text-xs text-slate-500 mt-2">Utilize vírgulas para separar as turmas.</p>
+                    </div>
                   </div>
                   <button
                     onClick={() => handleEditarCampo("classes")}

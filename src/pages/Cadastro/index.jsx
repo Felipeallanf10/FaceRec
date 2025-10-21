@@ -8,7 +8,6 @@ import {
   Brain, 
   Shield, 
   Zap, 
-  Network, 
   Target, 
   User, 
   Lock, 
@@ -18,8 +17,7 @@ import {
   ArrowRight,
   ArrowLeft,
   CheckCircle,
-  CreditCard,
-  Users
+  CreditCard
 } from "lucide-react";
 
 export default function Cadastro() {
@@ -31,8 +29,6 @@ export default function Cadastro() {
     phone: "",
     cpf: "",
     subject: "",
-    school: "",
-    classes: "",
   });
   
   const [loading, setLoading] = useState(false);
@@ -49,7 +45,7 @@ export default function Cadastro() {
 
   const validateStep1 = () => {
     const hasBasic = formData.fullName.length >= 2 && formData.email && formData.phone && formData.cpf.length >= 11;
-    const hasTeachingData = formData.subject.trim().length > 0 && formData.school.trim().length > 0 && formData.classes.trim().length > 0;
+    const hasTeachingData = formData.subject.trim().length > 0;
     return hasBasic && hasTeachingData;
   };
 
@@ -79,29 +75,13 @@ export default function Cadastro() {
     setLoading(true);
     
     try {
-      const classListRaw = formData.classes
-        .split(',')
-        .map((item) => item.trim())
-        .filter((item) => item.length > 0);
-
-      const classSet = new Set();
-      const classList = [];
-      classListRaw.forEach((item) => {
-        const key = item.toLowerCase();
-        if (classSet.has(key)) return;
-        classSet.add(key);
-        classList.push(item);
-      });
-
       const { data } = await api.post("/signup", {
         fullName: formData.fullName.trim(),
-  email: formData.email.trim().toLowerCase(),
+        email: formData.email.trim().toLowerCase(),
         password: formData.password,
         phone: formData.phone.trim(),
         cpf: formData.cpf.trim(),
         subject: formData.subject.trim(),
-        school: formData.school.trim(),
-        classes: classList,
       });
       
       if (data?.error) throw new Error(data.error);
@@ -241,137 +221,98 @@ export default function Cadastro() {
                 >
                   
                   {/* Nome Completo */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-700 text-ai">Nome Completo</label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <User className="h-5 w-5" style={{color: '#e4a576'}} />
+                  <div>
+                    <div className="flex items-center gap-3">
+                      <User className="h-5 w-5 text-slate-500 flex-shrink-0" />
+                      <div className="flex-1 space-y-2">
+                        <label className="text-sm font-medium text-slate-700 text-ai">Nome Completo</label>
+                        <input
+                          type="text"
+                          name="fullName"
+                          value={formData.fullName}
+                          onChange={handleChange}
+                          required
+                          placeholder=""
+                          className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200 text-ai bg-white/80"
+                        />
                       </div>
-                      <input
-                        type="text"
-                        name="fullName"
-                        value={formData.fullName}
-                        onChange={handleChange}
-                        required
-                        placeholder=""
-                        className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200 text-ai bg-white/80"
-                      />
                     </div>
                   </div>
 
                   {/* Email */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-700 text-ai">Email FaceRec</label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Mail className="h-5 w-5" style={{color: '#e4a576'}} />
+                  <div>
+                    <div className="flex items-center gap-3">
+                      <Mail className="h-5 w-5 text-slate-500 flex-shrink-0" />
+                      <div className="flex-1 space-y-2">
+                        <label className="text-sm font-medium text-slate-700 text-ai">Email FaceRec</label>
+                        <input
+                          type="email"
+                          name="email"
+                          value={formData.email}
+                          onChange={handleChange}
+                          required
+                          placeholder=""
+                          className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200 text-ai bg-white/80"
+                        />
                       </div>
-                      <input
-                        type="email"
-                        name="email"
-                        value={formData.email}
-                        onChange={handleChange}
-                        required
-                        placeholder=""
-                        className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200 text-ai bg-white/80"
-                      />
                     </div>
                   </div>
 
                   {/* Telefone */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-700 text-ai">Telefone</label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Phone className="h-5 w-5" style={{color: '#e4a576'}} />
+                  <div>
+                    <div className="flex items-center gap-3">
+                      <Phone className="h-5 w-5 text-slate-500 flex-shrink-0" />
+                      <div className="flex-1 space-y-2">
+                        <label className="text-sm font-medium text-slate-700 text-ai">Telefone</label>
+                        <input
+                          type="tel"
+                          name="phone"
+                          value={formData.phone}
+                          onChange={handleChange}
+                          required
+                          placeholder=""
+                          className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200 text-ai bg-white/80"
+                        />
                       </div>
-                      <input
-                        type="tel"
-                        name="phone"
-                        value={formData.phone}
-                        onChange={handleChange}
-                        required
-                        placeholder=""
-                        className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200 text-ai bg-white/80"
-                      />
                     </div>
                   </div>
 
                   {/* CPF */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-700 text-ai">CPF</label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <CreditCard className="h-5 w-5" style={{color: '#e4a576'}} />
+                  <div>
+                    <div className="flex items-center gap-3">
+                      <CreditCard className="h-5 w-5 text-slate-500 flex-shrink-0" />
+                      <div className="flex-1 space-y-2">
+                        <label className="text-sm font-medium text-slate-700 text-ai">CPF</label>
+                        <input
+                          type="text"
+                          name="cpf"
+                          value={formData.cpf}
+                          onChange={handleChange}
+                          required
+                          placeholder=""
+                          className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200 text-ai bg-white/80"
+                        />
                       </div>
-                      <input
-                        type="text"
-                        name="cpf"
-                        value={formData.cpf}
-                        onChange={handleChange}
-                        required
-                        placeholder=""
-                        className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200 text-ai bg-white/80"
-                      />
                     </div>
                   </div>
 
                   {/* Matéria */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-700 text-ai">Matéria lecionada</label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Target className="h-5 w-5" style={{color: '#e4a576'}} />
+                  <div>
+                    <div className="flex items-center gap-3">
+                      <Target className="h-5 w-5 text-slate-500 flex-shrink-0" />
+                      <div className="flex-1 space-y-2">
+                        <label className="text-sm font-medium text-slate-700 text-ai">Matéria lecionada</label>
+                        <input
+                          type="text"
+                          name="subject"
+                          value={formData.subject}
+                          onChange={handleChange}
+                          required
+                          placeholder="Ex: Matemática"
+                          className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200 text-ai bg-white/80"
+                        />
                       </div>
-                      <input
-                        type="text"
-                        name="subject"
-                        value={formData.subject}
-                        onChange={handleChange}
-                        required
-                        placeholder="Ex: Matemática"
-                        className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200 text-ai bg-white/80"
-                      />
                     </div>
-                  </div>
-
-                  {/* Escola */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-700 text-ai">Escola</label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Network className="h-5 w-5" style={{color: '#e4a576'}} />
-                      </div>
-                      <input
-                        type="text"
-                        name="school"
-                        value={formData.school}
-                        onChange={handleChange}
-                        required
-                        placeholder="Ex: Escola Municipal Central"
-                        className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200 text-ai bg-white/80"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Turmas */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-700 text-ai">Turmas atribuídas</label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Users className="h-5 w-5" style={{color: '#e4a576'}} />
-                      </div>
-                      <input
-                        type="text"
-                        name="classes"
-                        value={formData.classes}
-                        onChange={handleChange}
-                        required
-                        placeholder="Separe por vírgulas, ex: 1ºA, 1ºB, 2ºA"
-                        className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200 text-ai bg-white/80"
-                      />
-                    </div>
-                    <p className="text-xs text-slate-500 text-ai">Você pode editar ou adicionar novas turmas depois pelo painel.</p>
                   </div>
 
                   {/* Botão Próximo */}
@@ -400,62 +341,66 @@ export default function Cadastro() {
                 >
                   
                   {/* Senha */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-700 text-ai">Senha de Acesso</label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Lock className="h-5 w-5" style={{color: '#e4a576'}} />
+                  <div>
+                    <div className="flex items-center gap-3">
+                      <Lock className="h-5 w-5 text-slate-500 flex-shrink-0" />
+                      <div className="flex-1 space-y-2">
+                        <label className="text-sm font-medium text-slate-700 text-ai">Senha de Acesso</label>
+                        <div className="relative">
+                          <input
+                            type={showPassword ? "text" : "password"}
+                            name="password"
+                            value={formData.password}
+                            onChange={handleChange}
+                            required
+                            placeholder=""
+                            className="w-full px-4 py-3 pr-12 border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200 text-ai bg-white/80"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                          >
+                            {showPassword ? (
+                              <EyeOff className="h-5 w-5 text-slate-400 hover:text-slate-600" />
+                            ) : (
+                              <Eye className="h-5 w-5 text-slate-400 hover:text-slate-600" />
+                            )}
+                          </button>
+                        </div>
                       </div>
-                      <input
-                        type={showPassword ? "text" : "password"}
-                        name="password"
-                        value={formData.password}
-                        onChange={handleChange}
-                        required
-                        placeholder=""
-                        className="w-full pl-10 pr-12 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200 text-ai bg-white/80"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                      >
-                        {showPassword ? (
-                          <EyeOff className="h-5 w-5 text-slate-400 hover:text-slate-600" />
-                        ) : (
-                          <Eye className="h-5 w-5 text-slate-400 hover:text-slate-600" />
-                        )}
-                      </button>
                     </div>
                   </div>
 
                   {/* Confirmar Senha */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-700 text-ai">Confirmar Senha</label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Shield className="h-5 w-5" style={{color: '#e4a576'}} />
+                  <div>
+                    <div className="flex items-center gap-3">
+                      <Shield className="h-5 w-5 text-slate-500 flex-shrink-0" />
+                      <div className="flex-1 space-y-2">
+                        <label className="text-sm font-medium text-slate-700 text-ai">Confirmar Senha</label>
+                        <div className="relative">
+                          <input
+                            type={showConfirmPassword ? "text" : "password"}
+                            name="confirmPassword"
+                            value={formData.confirmPassword}
+                            onChange={handleChange}
+                            required
+                            placeholder=""
+                            className="w-full px-4 py-3 pr-12 border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200 text-ai bg-white/80"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                            className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                          >
+                            {showConfirmPassword ? (
+                              <EyeOff className="h-5 w-5 text-slate-400 hover:text-slate-600" />
+                            ) : (
+                              <Eye className="h-5 w-5 text-slate-400 hover:text-slate-600" />
+                            )}
+                          </button>
+                        </div>
                       </div>
-                      <input
-                        type={showConfirmPassword ? "text" : "password"}
-                        name="confirmPassword"
-                        value={formData.confirmPassword}
-                        onChange={handleChange}
-                        required
-                        placeholder=""
-                        className="w-full pl-10 pr-12 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200 text-ai bg-white/80"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                      >
-                        {showConfirmPassword ? (
-                          <EyeOff className="h-5 w-5 text-slate-400 hover:text-slate-600" />
-                        ) : (
-                          <Eye className="h-5 w-5 text-slate-400 hover:text-slate-600" />
-                        )}
-                      </button>
                     </div>
                   </div>
 
@@ -519,25 +464,39 @@ export default function Cadastro() {
               )}
             </form>
 
-            {/* Link para Login */}
+            {/* Botões de Navegação */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.8, duration: 0.6 }}
-              className="mt-8 text-center"
+              className="mt-8 space-y-4"
             >
-              <p className="text-slate-600 text-ai">
-                Já possui acesso FaceRec?{" "}
+              {/* Botão Voltar para Login */}
+              <div className="text-center">
                 <Link
                   to="/login"
-                  className="font-semibold transition-colors"
-                  style={{color: '#698ea2'}}
-                  onMouseEnter={(e) => e.target.style.color = '#5a7a8a'}
-                  onMouseLeave={(e) => e.target.style.color = '#698ea2'}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 transition-colors"
                 >
-                  Entrar no Sistema
+                  <ArrowLeft className="w-4 h-4" />
+                  Voltar para Login
                 </Link>
-              </p>
+              </div>
+              
+              {/* Link para Login */}
+              <div className="text-center">
+                <p className="text-slate-600 text-ai">
+                  Já possui acesso FaceRec?{" "}
+                  <Link
+                    to="/login"
+                    className="font-semibold transition-colors"
+                    style={{color: '#698ea2'}}
+                    onMouseEnter={(e) => e.target.style.color = '#5a7a8a'}
+                    onMouseLeave={(e) => e.target.style.color = '#698ea2'}
+                  >
+                    Entrar no Sistema
+                  </Link>
+                </p>
+              </div>
             </motion.div>
           </div>
         </motion.div>

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useUser } from '../../contexts/UserContext';
 import api from '../../lib/api';
 import { Navigate } from 'react-router-dom';
+import FotoHubAluno from '../../Components/FotoHubAluno';
 import { 
   Users, 
   School, 
@@ -35,6 +36,7 @@ const Administracao = () => {
   const fileInputRef = useRef(null);
   const [importResumo, setImportResumo] = useState(null);
   const [importingToServer, setImportingToServer] = useState(false);
+  const [showFotoHub, setShowFotoHub] = useState(false);
 
   // Estados dos dados
   const [alunos, setAlunos] = useState([]);
@@ -146,40 +148,7 @@ const Administracao = () => {
     setShowModal(true);
   };
 
-  // Função para upload de foto do aluno
-  const handlePhotoUpload = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.onchange = (e) => {
-      const file = e.target.files?.[0];
-      if (file) {
-        // Verificar se é uma imagem
-        if (!file.type.startsWith('image/')) {
-          alert('❌ Por favor, selecione apenas arquivos de imagem (JPG, PNG, GIF, etc.)');
-          return;
-        }
-        
-        // Verificar tamanho do arquivo (máximo 5MB)
-        if (file.size > 5 * 1024 * 1024) {
-          alert('❌ A imagem deve ter no máximo 5MB');
-          return;
-        }
-        
-        // Converter para base64 e atualizar o estado
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const base64String = event.target.result;
-          setEditingItem(prev => ({
-            ...prev,
-            foto: base64String
-          }));
-        };
-        reader.readAsDataURL(file);
-      }
-    };
-    input.click();
-  };
+
 
   const handleSaveAluno = async () => {
     // Validações obrigatórias
@@ -596,7 +565,7 @@ const Administracao = () => {
                         </p>
                         <p className="text-xs text-blue-700">
                           Selecione uma sala existente para vincular o aluno. Caso não existam salas, 
-                          primeiro crie uma sala na aba "Gerenciar Salas".
+                          primeiro importe uma sala em "Importar CSV".
                         </p>
                       </div>
                     </div>
@@ -618,13 +587,15 @@ const Administracao = () => {
                       </div>
                     )}
                   </div>
-                  <div className="flex gap-3 justify-center">
+                  
+                  {/* Botões de controle de foto */}
+                  <div className="flex gap-3 justify-center mb-4">
                     <button 
-                      onClick={handlePhotoUpload}
+                      onClick={() => setShowFotoHub(!showFotoHub)}
                       className="text-blue-600 hover:text-blue-700 text-sm font-medium transition-colors"
                     >
                       <Upload className="w-4 h-4 inline mr-1" />
-                      {editingItem?.foto ? 'Trocar Foto' : 'Adicionar Foto'}
+                      {showFotoHub ? 'Fechar Editor' : 'Configurar Foto'}
                     </button>
                     {editingItem?.foto && (
                       <button 
@@ -636,6 +607,19 @@ const Administracao = () => {
                       </button>
                     )}
                   </div>
+
+                  {/* FotoHub integrado */}
+                  {showFotoHub && (
+                    <div className="mb-6">
+                      <FotoHubAluno 
+                        currentPhoto={editingItem?.foto}
+                        onPhotoChange={(newPhoto) => {
+                          console.log('📸 FotoHub: Nova foto recebida, tamanho:', newPhoto?.length || 'null');
+                          setEditingItem(prev => ({...prev, foto: newPhoto}));
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Campos do Aluno */}
@@ -870,7 +854,7 @@ const Administracao = () => {
                   }}
                   className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white min-w-[200px] text-sm"
                 >
-                  <option value="">� Todos os Alunos ({alunos.length})</option>
+                  <option value="">🎓 Todos os Alunos ({alunos.length})</option>
                   {salas.map(sala => {
                     const alunosDaSala = alunos.filter(aluno => aluno.salaId === sala.id);
                     return (
@@ -916,7 +900,7 @@ const Administracao = () => {
                     </div>
                   ) : salas.length === 0 ? (
                     <p className="text-orange-600 font-medium">
-                      ⚠️ Primeiro crie uma sala na aba "Gerenciar Salas"
+                      ⚠️ Primeiro importe uma sala, em "Importar CSV"
                     </p>
                   ) : (
                     <p className="text-green-600 font-medium">

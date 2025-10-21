@@ -93,7 +93,7 @@ export default function Esp32CamPlayer({
 
   return (
     <div className="relative">
-      {/* Loading overlay */}
+      {/* Sobreposição de carregamento */}
       {isLoading && (
         <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-xl">
           <div className="text-center">
@@ -107,7 +107,7 @@ export default function Esp32CamPlayer({
       <div className="relative bg-slate-900 rounded-xl overflow-hidden shadow-inner min-h-[400px] flex items-center justify-center">
         <img 
           ref={imgRef} 
-          alt="ESP32 Camera Stream" 
+          alt="Transmissão da Câmera ESP32" 
           className="w-full h-auto max-h-[600px] object-contain"
         />
         
