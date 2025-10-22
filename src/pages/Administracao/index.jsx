@@ -42,6 +42,8 @@ const Administracao = () => {
   const [alunos, setAlunos] = useState([]);
   const [salas, setSalas] = useState([]);
   const [salaSelecionada, setSalaSelecionada] = useState(null); // Para filtrar alunos por sala
+  const [selectedAlunos, setSelectedAlunos] = useState([]); // ids selecionados para exclusão
+  const [deleteSalaPrompt, setDeleteSalaPrompt] = useState(null); // {id, nome}
 
   // Verificar permissão de acesso
   if (!isAdmin()) {
@@ -98,6 +100,49 @@ const Administracao = () => {
 
     setAlunos(alunosCarregados);
     setSalas(salasCarregadas);
+  }, []);
+
+  // Ao montar, se houver token e for admin, tentar sincronizar com o backend
+  useEffect(() => {
+    const fetchAdminData = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        // Busca salas/alunos do backend
+        const res = await api.get('/admin/classrooms', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (res?.data) {
+          const { salas: salasServer = [], alunos: alunosServer = [] } = res.data;
+          // Mapear nomes/formatos caso necessário
+              setSalas(salasServer.map(s => ({
+            id: s.id,
+                nome: s.nome || s.name,
+            turma: s.turma || '',
+            periodo: s.periodo || '',
+            totalAlunos: s.total_students || s.totalAlunos || 0,
+            ativa: true
+          })));
+
+          setAlunos(alunosServer.map(a => ({
+                id: Number(a.id),
+            nome: a.nome,
+            matricula: a.matricula,
+            email: a.email,
+            telefone: a.telefone,
+                salaId: a.salaId ? Number(a.salaId) : a.salaId,
+            foto: a.foto,
+            ativo: a.ativo,
+            dataCadastro: a.dataCadastro || a.created_at
+          })));
+        }
+      } catch (err) {
+        console.warn('Não foi possível sincronizar salas do servidor:', err?.response?.data || err.message || err);
+      }
+    };
+
+    fetchAdminData();
   }, []);
 
   // Persistência automática - salva sempre que os dados mudam
@@ -219,9 +264,73 @@ const Administracao = () => {
   const handleDeleteAluno = (alunoId) => {
     const aluno = alunos.find(a => a.id === alunoId);
     if (confirm(`Tem certeza que deseja excluir o aluno ${aluno?.nome}? Esta ação não pode ser desfeita.`)) {
-      setAlunos(prev => prev.filter(a => a.id !== alunoId));
-      console.log(`🗑️ Aluno ${aluno?.nome} removido pelo admin ${usuario?.email}`);
-      alert(`🗑️ Aluno ${aluno?.nome} foi removido do sistema.`);
+      (async () => {
+        const token = localStorage.getItem('token');
+        try {
+          if (token) {
+            await api.delete(`/admin/students/${alunoId}`, { headers: { Authorization: `Bearer ${token}` } });
+          }
+        } catch (err) {
+          console.warn('Falha ao deletar aluno no servidor:', err?.response?.data || err.message || err);
+        }
+
+  const remaining = alunos.filter(a => a.id !== alunoId);
+  setAlunos(remaining);
+        console.log(`🗑️ Aluno ${aluno?.nome} removido pelo admin ${usuario?.email}`);
+        alert(`🗑️ Aluno ${aluno?.nome} foi removido do sistema.`);
+  salvarDados('alunos', remaining);
+      })();
+    }
+  };
+
+  // Seleção em massa: toggle, selecionar todos visíveis e limpar seleção
+  const toggleSelectAluno = (alunoId) => {
+    setSelectedAlunos(prev => {
+      if (prev.includes(alunoId)) return prev.filter(id => id !== alunoId);
+      return [...prev, alunoId];
+    });
+  };
+
+  const selectAllVisiveis = () => {
+    const alunosFiltrados = salaSelecionada ? alunos.filter(a => a.salaId === salaSelecionada.id) : alunos;
+    const ids = alunosFiltrados.map(a => a.id);
+    setSelectedAlunos(ids);
+  };
+
+  const clearSelection = () => setSelectedAlunos([]);
+
+  const handleDeleteSelected = async () => {
+    if (selectedAlunos.length === 0) return alert('Nenhum aluno selecionado.');
+
+    if (!confirm(`Tem certeza que deseja excluir ${selectedAlunos.length} aluno(s)? Esta ação não pode ser desfeita.`)) return;
+
+    const token = localStorage.getItem('token');
+    const idsToDelete = [...selectedAlunos];
+    const failed = [];
+
+    try {
+      if (token) {
+        // Chama deletions em paralelo (mas coletando resultados)
+        const promises = idsToDelete.map(id => api.delete(`/admin/students/${id}`, { headers: { Authorization: `Bearer ${token}` } }).catch(err => ({ error: err, id })));
+        const results = await Promise.all(promises);
+        results.forEach(r => {
+          if (r && r.error) failed.push(r.id);
+        });
+      }
+    } catch (err) {
+      console.warn('Erro durante exclusão múltipla:', err);
+    }
+
+    // Atualiza estado local removendo os ids que foram (provavelmente) deletados
+    const remaining = alunos.filter(a => !idsToDelete.includes(a.id));
+    setAlunos(remaining);
+    salvarDados('alunos', remaining);
+    clearSelection();
+
+    if (failed.length > 0) {
+      alert(`Alguns alunos não puderam ser deletados no servidor: ${failed.join(', ')}. Eles foram removidos localmente.`);
+    } else {
+      alert(`${idsToDelete.length - failed.length} aluno(s) removido(s) com sucesso.`);
     }
   };
 
@@ -269,6 +378,66 @@ const Administracao = () => {
     setEditingItem(null);
   };
 
+  const handleDeleteSala = (salaId) => {
+    const sala = salas.find(s => s.id === salaId) || editingItem;
+    if (!sala) {
+      alert('Sala não encontrada');
+      return;
+    }
+    setDeleteSalaPrompt({ id: sala.id, nome: sala.nome });
+  };
+
+  const applyLocalSalaRemoval = (salaId, keepStudents) => {
+    const remainingSalas = salas.filter(s => s.id !== salaId);
+    let remainingAlunos;
+    if (keepStudents) {
+      remainingAlunos = alunos.map(a => a.salaId == salaId ? { ...a, salaId: null } : a);
+    } else {
+      remainingAlunos = alunos.filter(a => a.salaId != salaId);
+    }
+    setSalas(remainingSalas);
+    setAlunos(remainingAlunos);
+    salvarDados('salas', remainingSalas);
+    salvarDados('alunos', remainingAlunos);
+  };
+
+  const confirmDeleteSala = async (keepStudents) => {
+    if (!deleteSalaPrompt) return;
+    const salaId = deleteSalaPrompt.id;
+    const token = localStorage.getItem('token');
+    try {
+      if (token) {
+        await api.post(`/admin/classrooms/${salaId}/remove`, { keepStudents }, { headers: { Authorization: `Bearer ${token}` } });
+        applyLocalSalaRemoval(salaId, keepStudents);
+        try {
+          const fetchRes = await api.get('/admin/classrooms', { headers: { Authorization: `Bearer ${token}` } });
+          if (fetchRes?.data) {
+            const { salas: salasServer = [], alunos: alunosServer = [] } = fetchRes.data;
+            const mappedSalas = salasServer.map(s => ({ id: Number(s.id), nome: s.nome || s.name, turma: s.turma || '', periodo: s.periodo || '', totalAlunos: s.total_students || s.totalAlunos || 0, ativa: true }));
+            const mappedAlunos = alunosServer.map(a => ({ id: Number(a.id), nome: a.nome, matricula: a.matricula, email: a.email, telefone: a.telefone, salaId: a.salaId ? Number(a.salaId) : a.salaId, foto: a.foto, ativo: a.ativo, dataCadastro: a.dataCadastro || a.created_at }));
+            setSalas(mappedSalas);
+            setAlunos(mappedAlunos);
+            salvarDados('salas', mappedSalas);
+            salvarDados('alunos', mappedAlunos);
+          }
+        } catch (e) {
+          console.warn('Falha ao re-sincronizar após remoção da sala:', e?.response?.data || e.message || e);
+        }
+      } else {
+        applyLocalSalaRemoval(salaId, keepStudents);
+      }
+
+      setShowModal(false);
+      setEditingItem(null);
+      alert(keepStudents ? 'Sala removida e alunos mantidos.' : 'Sala e alunos removidos.');
+    } catch (err) {
+      console.error('Erro ao remover sala:', err);
+      alert('Erro ao remover sala: ' + (err?.response?.data?.error || err.message || err));
+    } finally {
+      setDeleteSalaPrompt(null);
+    }
+  };
+
   // Funções de backup e exportação
   const exportarDados = () => {
     const dadosCompletos = {
@@ -297,34 +466,7 @@ const Administracao = () => {
     alert('📁 Backup dos dados exportado com sucesso!');
   };
 
-  const limparTodosDados = () => {
-    const confirmacao = prompt(
-      'ATENÇÃO! Esta ação irá apagar TODOS os dados salvos.\n\n' +
-      'Digite "CONFIRMAR EXCLUSÃO" para prosseguir:', 
-      ''
-    );
-    
-    if (confirmacao === 'CONFIRMAR EXCLUSÃO') {
-      // Limpar localStorage
-      ['admin_alunos', 'admin_salas'].forEach(key => {
-        localStorage.removeItem(key);
-      });
-      
-      // Resetar estados para dados vazios
-      setAlunos([]);
-      setSalas([]);
-      setImportResumo(null);
-
-      
-      console.log(`🗑️ Todos os dados foram limpos pelo admin ${usuario?.email}`);
-      alert('🗑️ Todos os dados foram removidos do sistema!');
-      
-      // Recarregar a página para voltar aos dados mock
-      window.location.reload();
-    } else {
-      alert('Operação cancelada. Dados preservados.');
-    }
-  };
+  
 
   const parseCsvContent = (text) => {
     const rawLines = text.split(/\r?\n/);
@@ -515,6 +657,44 @@ const Administracao = () => {
 
       if (res?.data?.success) {
         alert(`✅ Importação enviada com sucesso. Alunos inseridos: ${res.data.inserted || 0}`);
+        // Atualizar dados locais com o que está no servidor
+        try {
+          const fetchRes = await api.get('/admin/classrooms', {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+
+          if (fetchRes?.data) {
+            const { salas: salasServer = [], alunos: alunosServer = [] } = fetchRes.data;
+            const mappedSalas = salasServer.map(s => ({
+              id: s.id,
+              nome: s.nome || s.name,
+              turma: s.turma || '',
+              periodo: s.periodo || '',
+              totalAlunos: s.total_students || s.totalAlunos || 0,
+              ativa: true
+            }));
+
+            const mappedAlunos = alunosServer.map(a => ({
+              id: a.id,
+              nome: a.nome,
+              matricula: a.matricula,
+              email: a.email,
+              telefone: a.telefone,
+              salaId: a.salaId,
+              foto: a.foto,
+              ativo: a.ativo,
+              dataCadastro: a.dataCadastro || a.created_at
+            }));
+
+            setSalas(mappedSalas);
+            setAlunos(mappedAlunos);
+            // Persistir no formato esperado
+            salvarDados('salas', mappedSalas);
+            salvarDados('alunos', mappedAlunos);
+          }
+        } catch (e) {
+          console.warn('Falha ao atualizar salas locais após import:', e?.response?.data || e.message || e);
+        }
       } else {
         alert('Resposta inesperada do servidor: ' + JSON.stringify(res.data));
       }
@@ -743,6 +923,15 @@ const Administracao = () => {
             >
               Cancelar
             </button>
+            {modalType === 'sala' && editingItem?.id && (
+              <button
+                onClick={() => handleDeleteSala(editingItem.id)}
+                className="px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-lg transition-colors"
+              >
+                <Trash2 className="w-4 h-4 inline mr-2" />
+                Excluir Sala
+              </button>
+            )}
             <button
               onClick={modalType === 'aluno' ? handleSaveAluno : handleSaveSala}
               className="flex items-center space-x-2 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
@@ -809,13 +998,7 @@ const Administracao = () => {
                   <Save className="w-4 h-4" />
                   <span>Exportar Backup</span>
                 </button>
-                <button
-                  onClick={limparTodosDados}
-                  className="flex items-center space-x-2 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs rounded-lg transition-colors"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  <span>Limpar Dados</span>
-                </button>
+                {/* botão 'Limpar Dados' removido conforme solicitação do usuário */}
               </div>
             </div>
             <div className="text-xs text-gray-600 bg-white px-3 py-1 rounded-full border">
@@ -832,38 +1015,45 @@ const Administracao = () => {
 
             {/* Header da seção Alunos com Seletor de Sala */}
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-gray-800">
-                Lista de Alunos
-                {salaSelecionada && (
-                  <span className="ml-2 text-sm font-normal text-green-600">
-                    - {salaSelecionada.nome}
-                  </span>
-                )}
-              </h2>
-              
-              {/* Seletor de Sala */}
+              <div>
+                <h2 className="text-xl font-semibold text-gray-800">
+                  Lista de Alunos
+                  {salaSelecionada && (
+                    <span className="ml-2 text-sm font-normal text-green-600">- {salaSelecionada.nome}</span>
+                  )}
+                </h2>
+                <div className="text-sm text-gray-500">{alunos.length} aluno(s) no total</div>
+              </div>
+
               <div className="flex items-center space-x-3">
-                <label className="text-sm font-medium text-gray-700">
-                  Filtrar por sala:
-                </label>
-                <select
-                  value={salaSelecionada?.id || ''}
-                  onChange={(e) => {
-                    const salaId = e.target.value;
-                    setSalaSelecionada(salaId ? salas.find(s => s.id == salaId) : null);
-                  }}
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white min-w-[200px] text-sm"
-                >
-                  <option value="">🎓 Todos os Alunos ({alunos.length})</option>
-                  {salas.map(sala => {
-                    const alunosDaSala = alunos.filter(aluno => aluno.salaId === sala.id);
-                    return (
-                      <option key={sala.id} value={sala.id}>
-                        📚 {sala.nome} ({alunosDaSala.length} alunos)
-                      </option>
-                    );
-                  })}
-                </select>
+                <div className="flex items-center space-x-2">
+                  <button onClick={selectAllVisiveis} className="px-3 py-1 bg-gray-100 rounded text-sm">Selecionar visíveis</button>
+                  <button onClick={clearSelection} className="px-3 py-1 bg-gray-100 rounded text-sm">Limpar seleção</button>
+                  <button onClick={handleDeleteSelected} className="px-3 py-1 bg-red-600 text-white rounded text-sm">Excluir selecionados</button>
+                </div>
+
+                {/* Seletor de Sala */}
+                <div className="flex items-center space-x-3">
+                  <label className="text-sm font-medium text-gray-700">Filtrar por sala:</label>
+                  <select
+                    value={salaSelecionada?.id || ''}
+                    onChange={(e) => {
+                      const salaId = e.target.value;
+                      setSalaSelecionada(salaId ? salas.find(s => s.id == salaId) : null);
+                    }}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white min-w-[200px] text-sm"
+                  >
+                    <option value="">🎓 Todos os Alunos ({alunos.length})</option>
+                    {salas.map(sala => {
+                      const alunosDaSala = alunos.filter(aluno => aluno.salaId === sala.id);
+                      return (
+                        <option key={sala.id} value={sala.id}>
+                          📚 {sala.nome} ({alunosDaSala.length} alunos)
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
               </div>
             </div>
 
@@ -871,7 +1061,7 @@ const Administracao = () => {
             {(() => {
               // Filtrar alunos baseado na sala selecionada
               const alunosFiltrados = salaSelecionada 
-                ? alunos.filter(aluno => aluno.salaId === salaSelecionada.id)
+                ? alunos.filter(aluno => aluno.salaId == salaSelecionada.id)
                 : alunos;
               
               return alunosFiltrados.length === 0 ? (
@@ -914,6 +1104,13 @@ const Administracao = () => {
                   <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <input type="checkbox" checked={selectedAlunos.length > 0 && (
+                          (salaSelecionada ? alunos.filter(a => a.salaId === salaSelecionada.id).every(a => selectedAlunos.includes(a.id)) : alunos.every(a => selectedAlunos.includes(a.id)))
+                        )} onChange={(e) => {
+                          if (e.target.checked) selectAllVisiveis(); else clearSelection();
+                        }} />
+                      </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Aluno
                       </th>
@@ -936,13 +1133,22 @@ const Administracao = () => {
                       const sala = salas.find(s => s.id === aluno.salaId);
                       return (
                         <tr key={aluno.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <input type="checkbox" checked={selectedAlunos.includes(aluno.id)} onChange={() => toggleSelectAluno(aluno.id)} />
+                          </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">
-                              <img
-                                src={aluno.foto}
-                                alt={aluno.nome}
-                                className="h-10 w-10 rounded-full object-cover"
-                              />
+                              {aluno.foto ? (
+                                <img
+                                  src={aluno.foto}
+                                  alt={aluno.nome}
+                                  className="h-10 w-10 rounded-full object-cover"
+                                />
+                              ) : (
+                                <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center">
+                                  <span className="text-gray-600 text-xs font-medium">{aluno.nome.charAt(0).toUpperCase()}</span>
+                                </div>
+                              )}
                               <div className="ml-4">
                                 <div className="text-sm font-medium text-gray-900">
                                   {aluno.nome}
@@ -1000,10 +1206,94 @@ const Administracao = () => {
             </div>
             );
             })()}
+
+            {/* Seção: Alunos desvinculados (sem sala) */}
+            <div className="mt-10">
+              <h3 className="text-lg font-semibold mb-3">Alunos desvinculados (sem sala)</h3>
+              {alunos.filter(a => !a.salaId || a.salaId === null).length === 0 ? (
+                <p className="text-sm text-gray-500">Nenhum aluno desvinculado.</p>
+              ) : (
+                <div className="bg-white rounded-lg p-4 border border-gray-100">
+                  {alunos.filter(a => !a.salaId || a.salaId === null).map(aluno => (
+                    <div key={aluno.id} className="flex items-center justify-between py-2 border-b last:border-b-0">
+                      <div>
+                        <div className="font-medium">{aluno.nome}</div>
+                        <div className="text-xs text-gray-500">Matrícula: {aluno.matricula}</div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="text"
+                          placeholder="Série / Turma"
+                          defaultValue={aluno.turma || ''}
+                          onBlur={(e) => {
+                            const serie = e.target.value;
+                            const novo = alunos.map(a => a.id === aluno.id ? { ...a, turma: serie } : a);
+                            setAlunos(novo);
+                            salvarDados('alunos', novo);
+                          }}
+                          className="px-3 py-1 border rounded text-sm"
+                        />
+                        <button
+                          onClick={() => {
+                            if (!confirm('Remover aluno definitivamente?')) return;
+                            const token = localStorage.getItem('token');
+                            (async () => {
+                              try {
+                                if (token) await api.delete(`/admin/students/${aluno.id}`, { headers: { Authorization: `Bearer ${token}` } });
+                              } catch (e) { console.warn('Falha ao remover aluno servidor:', e); }
+                              const remaining = alunos.filter(a => a.id !== aluno.id);
+                              setAlunos(remaining);
+                              salvarDados('alunos', remaining);
+                            })();
+                          }}
+                          className="px-3 py-1 bg-red-600 text-white rounded text-sm"
+                        >Excluir</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
         </div>
 
 
       </div>
+
+      {deleteSalaPrompt && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">Remover sala</h3>
+              <p className="text-sm text-gray-600 mt-1">
+                O que deseja fazer com a sala <span className="font-semibold">{deleteSalaPrompt.nome}</span>?
+              </p>
+            </div>
+            <div className="space-y-3">
+              <button
+                onClick={() => confirmDeleteSala(false)}
+                className="w-full px-4 py-3 bg-red-600 text-white rounded-lg flex items-center justify-center space-x-2 hover:bg-red-700 transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Excluir sala e alunos vinculados</span>
+              </button>
+              <button
+                onClick={() => confirmDeleteSala(true)}
+                className="w-full px-4 py-3 bg-amber-100 text-amber-800 rounded-lg flex items-center justify-center space-x-2 hover:bg-amber-200 transition-colors"
+              >
+                <span>Remover sala e manter alunos (desvincular)</span>
+              </button>
+            </div>
+            <div className="text-right">
+              <button
+                onClick={() => setDeleteSalaPrompt(null)}
+                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal */}
       <Modal />

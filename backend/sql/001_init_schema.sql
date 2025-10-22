@@ -43,6 +43,35 @@ CREATE TABLE teacher_classes (
     REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE classrooms (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  owner_user_id BIGINT UNSIGNED NULL,
+  name VARCHAR(120) NOT NULL,
+  turma VARCHAR(120) DEFAULT NULL,
+  periodo VARCHAR(60) DEFAULT NULL,
+  total_students INT DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_classrooms_owner (owner_user_id),
+  UNIQUE KEY uq_classroom_owner_name (owner_user_id, name)
+);
+
+CREATE TABLE students (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  nome VARCHAR(150) NOT NULL,
+  matricula VARCHAR(100) DEFAULT NULL,
+  email VARCHAR(150) DEFAULT NULL,
+  telefone VARCHAR(30) DEFAULT NULL,
+  classroom_id BIGINT UNSIGNED DEFAULT NULL,
+  owner_user_id BIGINT UNSIGNED DEFAULT NULL,
+  foto VARCHAR(500) DEFAULT NULL,
+  ativo TINYINT(1) DEFAULT 1,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_students_owner (owner_user_id),
+  CONSTRAINT fk_students_classroom FOREIGN KEY (classroom_id) REFERENCES classrooms(id) ON DELETE SET NULL
+);
+
 CREATE TABLE attendance_logs (
   id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   user_id       BIGINT UNSIGNED NOT NULL,

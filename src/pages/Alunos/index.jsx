@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import api from '../../lib/api';
+import { Trash2 } from 'lucide-react';
 
 /**
  * Página Alunos - Lista todas as salas de aula disponíveis
@@ -16,7 +18,9 @@ import { useNavigate } from 'react-router-dom';
 const Alunos = () => {
   const navigate = useNavigate();
   const [salas, setSalas] = useState([]);
+  const [alunosAdminState, setAlunosAdminState] = useState([]);
   const [modalChamada, setModalChamada] = useState({ aberto: false, sala: null, alunos: [] });
+  const [deletePrompt, setDeletePrompt] = useState(null); // {sala}
 
   // Carregar dados do administrador - apenas salas importadas via CSV
   useEffect(() => {
@@ -34,12 +38,14 @@ const Alunos = () => {
             let alunosSalvos = [];
             if (alunosAdmin) {
               const { dados: alunosData } = JSON.parse(alunosAdmin);
-              alunosSalvos = alunosData || [];
+              alunosSalvos = (alunosData || []).map(a => ({ ...a, id: Number(a.id), salaId: a.salaId ? Number(a.salaId) : a.salaId }));
             }
+            setAlunosAdminState(alunosSalvos);
             
             const salasComContagem = salasSalvas.map(sala => ({
               ...sala,
-              totalAlunos: alunosSalvos.filter(aluno => aluno.salaId === sala.id).length || sala.totalAlunos || 0
+              id: Number(sala.id),
+              totalAlunos: alunosSalvos.filter(aluno => aluno.salaId == sala.id).length || sala.totalAlunos || 0
             }));
             
             console.log('✅ Carregadas salas importadas via CSV:', salasComContagem);
@@ -51,10 +57,12 @@ const Alunos = () => {
         // Se não há salas importadas, mostrar lista vazia
         console.log('📝 Nenhuma sala importada via CSV encontrada');
         setSalas([]);
+        setAlunosAdminState([]);
         
       } catch (error) {
         console.error('❌ Erro ao carregar salas:', error);
-        setSalas([]);
+  setSalas([]);
+  setAlunosAdminState([]);
       }
     };
     
@@ -99,6 +107,48 @@ const Alunos = () => {
   const fecharChamadaManual = () => {
     setModalChamada({ aberto: false, sala: null, alunos: [] });
     navigate('/'); // Redireciona para a home page
+  };
+
+  const removerSala = async (sala, keepStudents) => {
+    const applyLocalRemoval = () => {
+      const remainingSalas = salas.filter(s => s.id !== sala.id);
+      let updatedAlunos;
+      if (keepStudents) {
+        updatedAlunos = alunosAdminState.map(a => a.salaId == sala.id ? { ...a, salaId: null } : a);
+      } else {
+        updatedAlunos = alunosAdminState.filter(a => a.salaId != sala.id);
+      }
+      setSalas(remainingSalas);
+      setAlunosAdminState(updatedAlunos);
+      localStorage.setItem('admin_salas', JSON.stringify({ dados: remainingSalas, timestamp: new Date().toISOString(), usuario: 'admin' }));
+      localStorage.setItem('admin_alunos', JSON.stringify({ dados: updatedAlunos, timestamp: new Date().toISOString(), usuario: 'admin' }));
+    };
+
+    const token = localStorage.getItem('token');
+    try {
+      if (token) {
+        await api.post(`/admin/classrooms/${sala.id}/remove`, { keepStudents }, { headers: { Authorization: `Bearer ${token}` } });
+        applyLocalRemoval();
+        const fetchRes = await api.get('/admin/classrooms', { headers: { Authorization: `Bearer ${token}` } });
+        if (fetchRes?.data) {
+          const { salas: salasServer = [], alunos: alunosServer = [] } = fetchRes.data;
+          const mappedSalas = salasServer.map(s => ({ id: Number(s.id), nome: s.nome || s.name, turma: s.turma || '', periodo: s.periodo || '', totalAlunos: s.total_students || s.totalAlunos || 0 }));
+          const mappedAlunos = alunosServer.map(a => ({ id: Number(a.id), nome: a.nome, matricula: a.matricula, email: a.email, telefone: a.telefone, salaId: a.salaId ? Number(a.salaId) : a.salaId, foto: a.foto, ativo: a.ativo, dataCadastro: a.dataCadastro || a.created_at }));
+          setSalas(mappedSalas);
+          setAlunosAdminState(mappedAlunos);
+          localStorage.setItem('admin_salas', JSON.stringify({ dados: mappedSalas, timestamp: new Date().toISOString(), usuario: 'admin' }));
+          localStorage.setItem('admin_alunos', JSON.stringify({ dados: mappedAlunos, timestamp: new Date().toISOString(), usuario: 'admin' }));
+        }
+      } else {
+        applyLocalRemoval();
+      }
+      alert(keepStudents ? 'Sala removida e alunos mantidos.' : 'Sala e alunos removidos.');
+    } catch (err) {
+      console.error('Erro ao excluir sala:', err);
+      alert('Erro ao excluir sala: ' + (err?.response?.data?.error || err.message || err));
+    } finally {
+      setDeletePrompt(null);
+    }
   };
 
   /**
@@ -152,8 +202,19 @@ const Alunos = () => {
    */
   const CardSala = ({ sala }) => {
     return (
-      <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-6 border border-gray-100 hover:border-blue-200 transform hover:-translate-y-1">
-        {/* Cabeçalho do Card */}
+      <div className="relative bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-6 border border-gray-100 hover:border-blue-200 transform hover:-translate-y-1">
+        {/* Botão de excluir sala (X) */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setDeletePrompt({ sala });
+          }}
+          className="absolute right-3 top-3 text-gray-400 hover:text-red-600 bg-white rounded-full p-1 shadow"
+          title="Excluir sala"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+  {/* Cabeçalho do Card */}
         <div className="mb-4">
           <h3 className="text-xl font-bold text-gray-800 mb-2">
             {sala.nome}
@@ -219,6 +280,42 @@ const Alunos = () => {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">
+            {deletePrompt && (
+              <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+                <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Remover sala</h3>
+                    <p className="text-sm text-gray-600 mt-1">
+                      O que deseja fazer com a sala <span className="font-semibold">{deletePrompt.sala.nome}</span>?
+                    </p>
+                  </div>
+                  <div className="space-y-3">
+                    <button
+                      onClick={() => removerSala(deletePrompt.sala, false)}
+                      className="w-full px-4 py-3 bg-red-600 text-white rounded-lg flex items-center justify-center space-x-2 hover:bg-red-700 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span>Excluir sala e alunos vinculados</span>
+                    </button>
+                    <button
+                      onClick={() => removerSala(deletePrompt.sala, true)}
+                      className="w-full px-4 py-3 bg-amber-100 text-amber-800 rounded-lg flex items-center justify-center space-x-2 hover:bg-amber-200 transition-colors"
+                    >
+                      <span>Remover sala e manter alunos (desvincular)</span>
+                    </button>
+                  </div>
+                  <div className="text-right">
+                    <button
+                      onClick={() => setDeletePrompt(null)}
+                      className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
                 Gerenciar Salas de Aula
               </h1>
               <p className="mt-2 text-gray-600">

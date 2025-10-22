@@ -147,7 +147,9 @@ const Sala = () => {
     // Tentar encontrar a sala nos dados do admin primeiro
     let salaEncontrada = null;
     if (salasAdmin) {
-      salaEncontrada = salasAdmin.find(s => s.id == id);
+      // Normalizar ids para Number para comparação confiável
+      const salasNorm = salasAdmin.map(s => ({ ...s, id: Number(s.id) }));
+      salaEncontrada = salasNorm.find(s => s.id == Number(id));
       console.log('🔍 Procurando sala ID:', id, '- Encontrada:', salaEncontrada);
     }
     
@@ -162,7 +164,7 @@ const Sala = () => {
       
       // Tentar carregar alunos reais do admin para esta sala
       if (alunosAdmin) {
-        const alunosDaSala = alunosAdmin.filter(aluno => aluno.salaId == id);
+  const alunosDaSala = alunosAdmin.filter(aluno => Number(aluno.salaId) == Number(id));
         
         if (alunosDaSala.length > 0) {
           console.log(`✅ Carregados ${alunosDaSala.length} alunos REAIS da sala ${id}:`, alunosDaSala);

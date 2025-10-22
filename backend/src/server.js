@@ -20,6 +20,43 @@ import http from 'http';
 const app = express();
 const server = http.createServer(app);
 
+let ensuredClassroomsOwnerColumn = false;
+let ensuredStudentsOwnerColumn = false;
+
+async function ensureClassroomsOwnerColumn(conn) {
+  if (ensuredClassroomsOwnerColumn) return;
+  try {
+    const [cols] = await conn.execute(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'classrooms' AND COLUMN_NAME = 'owner_user_id'`
+    );
+    if (cols.length === 0) {
+      console.log('🔧 Adicionando coluna owner_user_id em classrooms (ajuste automático)');
+      await conn.execute(`ALTER TABLE classrooms ADD COLUMN owner_user_id BIGINT UNSIGNED NULL AFTER id`);
+      await conn.execute(`ALTER TABLE classrooms ADD INDEX idx_classrooms_owner (owner_user_id)`);
+    }
+    ensuredClassroomsOwnerColumn = true;
+  } catch (err) {
+    console.warn('⚠️  Falha ao garantir coluna owner_user_id em classrooms:', err?.message || err);
+  }
+}
+
+async function ensureStudentsOwnerColumn(conn) {
+  if (ensuredStudentsOwnerColumn) return;
+  try {
+    const [cols] = await conn.execute(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'students' AND COLUMN_NAME = 'owner_user_id'`
+    );
+    if (cols.length === 0) {
+      console.log('🔧 Adicionando coluna owner_user_id em students (ajuste automático)');
+      await conn.execute(`ALTER TABLE students ADD COLUMN owner_user_id BIGINT UNSIGNED NULL AFTER classroom_id`);
+      await conn.execute(`ALTER TABLE students ADD INDEX idx_students_owner (owner_user_id)`);
+    }
+    ensuredStudentsOwnerColumn = true;
+  } catch (err) {
+    console.warn('⚠️  Falha ao garantir coluna owner_user_id em students:', err?.message || err);
+  }
+}
+
 async function getUserWithClasses(userId, externalConn = null) {
   const conn = externalConn || await pool.getConnection();
   try {
@@ -79,6 +116,28 @@ function normalizeClassList(rawClasses) {
       seen.add(item.toLowerCase());
       return true;
     });
+}
+
+const DEFAULT_ADMIN_LOGIN_RAW = process.env.DEFAULT_ADMIN_LOGIN || '@administrador';
+const DEFAULT_ADMIN_LOGIN = normalizeEmail(DEFAULT_ADMIN_LOGIN_RAW);
+const DEFAULT_ADMIN_PASSWORD = process.env.DEFAULT_ADMIN_PASSWORD || '@administrador';
+const DEFAULT_ADMIN_ID = process.env.DEFAULT_ADMIN_ID || 'predefined-admin';
+const DEFAULT_ADMIN_NAME = process.env.DEFAULT_ADMIN_NAME || 'Administrador do Sistema';
+
+function buildPredefinedAdminUser() {
+  return {
+    id: DEFAULT_ADMIN_ID,
+    full_name: DEFAULT_ADMIN_NAME,
+    email: DEFAULT_ADMIN_LOGIN_RAW,
+    role: 'admin',
+    subject: null,
+    school: null,
+    phone: null,
+    cpf: null,
+    profile_picture: '',
+    photoURL: '',
+    classes: [],
+  };
 }
 
 /* ===== CORS (habilita front em Vite) ===== */
@@ -153,11 +212,31 @@ const authenticateToken = (req, res, next) => {
   const token = authHeader && authHeader.split(' ')[1];
   if (!token) return res.status(401).json({ error: 'Token de acesso requerido' });
 
+  // Permitir tokens "mock"/temporários em desenvolvimento quando explicitamente habilitado
+  const allowMock = (process.env.NODE_ENV || 'development') !== 'production' || process.env.ALLOW_MOCK_ADMIN === '1';
+  if (allowMock) {
+    try {
+      if (typeof token === 'string' && (token.startsWith('mock-token-') || token.startsWith('temp-admin-token-') || token.startsWith('mock-'))) {
+        console.log('🧪 Autenticação: token mock detectado e aceito (dev)');
+        req.user = {
+          sub: process.env.DEFAULT_ADMIN_ID || 'predefined-admin',
+          id: process.env.DEFAULT_ADMIN_ID || 'predefined-admin',
+          role: 'admin',
+        };
+        return next();
+      }
+    } catch (e) {
+      console.warn('Erro ao processar token mock:', e);
+    }
+  }
+
   jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
     if (err) {
       console.log('Erro no token:', err);
       return res.status(403).json({ error: 'Token inválido' });
     }
+    // Normaliza claims para garantir req.user.sub
+    if (!user.sub && user.id) user.sub = user.id;
     req.user = user;
     next();
   });
@@ -273,12 +352,31 @@ app.post('/api/signup', handleSignup);
 
 /* ===== Login ===== */
 const handleLogin = async (req, res) => {
-  const { email, password } = req.body || {};
+  const { email, login, password } = req.body || {};
+  const identifierRaw = email ?? login ?? '';
+  const normalizedIdentifier = normalizeEmail(identifierRaw);
+
+  if (!normalizedIdentifier) {
+    return res.status(400).json({ error: 'Informe o e-mail ou login' });
+  }
+
   try {
-    const normalizedEmail = normalizeEmail(email);
+    if (normalizedIdentifier === DEFAULT_ADMIN_LOGIN) {
+      if (String(password || '') !== String(DEFAULT_ADMIN_PASSWORD)) {
+        return res.status(401).json({ error: 'Senha incorreta' });
+      }
+
+      const adminUser = buildPredefinedAdminUser();
+      const token = jwt.sign({ sub: adminUser.id, role: adminUser.role }, process.env.JWT_SECRET, {
+        expiresIn: process.env.JWT_EXPIRES_IN || '24h',
+      });
+
+      return res.json({ token, user: adminUser });
+    }
+
     const [rows] = await pool.execute(
       `SELECT id, password_hash FROM users WHERE email = ?`,
-      [normalizedEmail]
+      [normalizedIdentifier]
     );
     if (rows.length === 0) return res.status(401).json({ error: 'Usuário não encontrado' });
 
@@ -298,27 +396,44 @@ const handleLogin = async (req, res) => {
     // Se houver falha de conexão com o DB, oferecer um fallback de administrador
     console.error('Erro no login (DB ou outro):', err?.code || err?.message || err);
 
-    const normalizedEmail = normalizeEmail(email);
-    const fallbackAdminEmail = 'admin@facerec.com';
-    const fallbackAdminPassword = 'FaceRec@123';
+    const fallbackCandidates = [
+      {
+        login: DEFAULT_ADMIN_LOGIN,
+        password: DEFAULT_ADMIN_PASSWORD,
+        user: buildPredefinedAdminUser(),
+      },
+      {
+        login: normalizeEmail('admin@facerec.com'),
+        password: 'FaceRec@123',
+        user: {
+          id: 'fallback-admin',
+          full_name: 'Administrador (fallback)',
+          email: 'admin@facerec.com',
+          role: 'admin',
+          subject: null,
+          school: null,
+          phone: null,
+          cpf: null,
+          profile_picture: '',
+          photoURL: '',
+          classes: [],
+        },
+      },
+    ];
 
-    // Aceita o login fallback se as credenciais coincidirem
-    if (normalizedEmail === fallbackAdminEmail && String(password) === fallbackAdminPassword) {
-      console.warn('⚠️  Usando fallback de admin (DB inacessível) para:', fallbackAdminEmail);
-      const fallbackId = 'fallback-admin';
-      const token = jwt.sign({ sub: fallbackId, role: 'admin' }, process.env.JWT_SECRET, {
+    const matchedFallback = fallbackCandidates.find(
+      (candidate) =>
+        normalizedIdentifier === candidate.login &&
+        String(password || '') === String(candidate.password)
+    );
+
+    if (matchedFallback) {
+      console.warn('⚠️  Usando fallback de admin (DB inacessível) para:', matchedFallback.user.email);
+      const token = jwt.sign({ sub: matchedFallback.user.id, role: matchedFallback.user.role }, process.env.JWT_SECRET, {
         expiresIn: process.env.JWT_EXPIRES_IN || '24h',
       });
 
-      const fallbackUser = {
-        id: fallbackId,
-        full_name: 'Administrador (fallback)',
-        email: fallbackAdminEmail,
-        role: 'admin',
-        classes: []
-      };
-
-      return res.json({ token, user: fallbackUser });
+      return res.json({ token, user: matchedFallback.user });
     }
 
     res.status(500).json({ error: 'Erro no login: ' + (err?.message || String(err)) });
@@ -408,6 +523,213 @@ app.post('/api/sync-firebase-user', async (req, res) => {
   } catch (err) {
     console.error('❌ Erro ao sincronizar usuário:', err);
     res.status(500).json({ error: 'Erro ao sincronizar usuário: ' + err.message });
+  }
+});
+
+/* ===== Listar salas e alunos do admin ===== */
+app.get('/api/admin/classrooms', authenticateToken, async (req, res) => {
+  try {
+    if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Acesso negado' });
+
+    const ownerId = req.user.sub || req.user.id;
+    const conn = await pool.getConnection();
+    try {
+      await ensureClassroomsOwnerColumn(conn);
+      await ensureStudentsOwnerColumn(conn);
+
+      const [classrooms] = await conn.execute(
+        `SELECT id, name as nome, turma, periodo, total_students, created_at FROM classrooms WHERE owner_user_id = ? ORDER BY name`,
+        [ownerId]
+      );
+
+      let alunos = [];
+      if (classrooms.length > 0) {
+        const ids = classrooms.map(c => c.id);
+        const placeholders = ids.map(() => '?').join(',');
+        if (ids.length > 0) {
+          const [rows] = await conn.execute(
+            `SELECT id, nome, matricula, email, telefone, classroom_id as salaId, foto, ativo, created_at
+             FROM students
+             WHERE classroom_id IN (${placeholders}) AND (owner_user_id IS NULL OR owner_user_id = ?)
+             ORDER BY nome`,
+            [...ids, ownerId]
+          );
+          alunos = rows.map(r => ({
+            id: r.id,
+            nome: r.nome,
+            matricula: r.matricula,
+            email: r.email,
+            telefone: r.telefone,
+            salaId: r.salaId,
+            foto: r.foto,
+            ativo: Boolean(r.ativo),
+            dataCadastro: r.created_at
+          }));
+        }
+      }
+
+      const [semSalaRows] = await conn.execute(
+        `SELECT id, nome, matricula, email, telefone, classroom_id as salaId, foto, ativo, created_at
+         FROM students
+         WHERE owner_user_id = ? AND classroom_id IS NULL
+         ORDER BY nome`,
+        [ownerId]
+      );
+
+      if (semSalaRows.length > 0) {
+        alunos.push(
+          ...semSalaRows.map(r => ({
+            id: r.id,
+            nome: r.nome,
+            matricula: r.matricula,
+            email: r.email,
+            telefone: r.telefone,
+            salaId: r.salaId,
+            foto: r.foto,
+            ativo: Boolean(r.ativo),
+            dataCadastro: r.created_at
+          }))
+        );
+      }
+
+      res.json({ salas: classrooms, alunos });
+    } finally {
+      conn.release();
+    }
+  } catch (err) {
+    console.error('Erro ao listar salas do admin:', err);
+    res.status(500).json({ error: 'Erro interno' });
+  }
+});
+
+/* ===== Deletar aluno admin ===== */
+app.delete('/api/admin/students/:id', authenticateToken, async (req, res) => {
+  try {
+    if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Acesso negado' });
+    const studentId = Number(req.params.id);
+    if (!studentId) return res.status(400).json({ error: 'ID inválido' });
+
+    const conn = await pool.getConnection();
+    try {
+      await ensureClassroomsOwnerColumn(conn);
+      await ensureStudentsOwnerColumn(conn);
+
+      // Verifica propriedade via classroom -> owner_user_id
+      const [rows] = await conn.execute(
+        `SELECT s.id, s.classroom_id, s.owner_user_id AS studentOwner, c.owner_user_id AS classOwner
+         FROM students s
+         LEFT JOIN classrooms c ON s.classroom_id = c.id
+         WHERE s.id = ?
+         LIMIT 1`,
+        [studentId]
+      );
+      if (rows.length === 0) return res.status(404).json({ error: 'Aluno não encontrado' });
+      const row = rows[0];
+      const owner = row.classOwner || row.studentOwner;
+      const ownerId = req.user.sub || req.user.id;
+      if (owner && String(owner) !== String(ownerId)) return res.status(403).json({ error: 'Acesso negado (não proprietário)' });
+
+      await conn.execute('DELETE FROM students WHERE id = ?', [studentId]);
+      res.json({ success: true });
+    } finally {
+      conn.release();
+    }
+  } catch (err) {
+    console.error('Erro ao deletar aluno:', err);
+    res.status(500).json({ error: 'Erro interno' });
+  }
+});
+
+/* ===== Deletar sala admin ===== */
+app.delete('/api/admin/classrooms/:id', authenticateToken, async (req, res) => {
+  try {
+    if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Acesso negado' });
+    const classroomId = Number(req.params.id);
+    if (!classroomId) return res.status(400).json({ error: 'ID inválido' });
+
+    const conn = await pool.getConnection();
+    let transactionStarted = false;
+    try {
+      await ensureClassroomsOwnerColumn(conn);
+      await ensureStudentsOwnerColumn(conn);
+
+      // Verifica propriedade
+      const [rows] = await conn.execute('SELECT owner_user_id FROM classrooms WHERE id = ? LIMIT 1', [classroomId]);
+      if (rows.length === 0) return res.status(404).json({ error: 'Sala não encontrada' });
+      const owner = rows[0].owner_user_id;
+      const ownerId = req.user.sub || req.user.id;
+      if (owner && String(owner) !== String(ownerId)) return res.status(403).json({ error: 'Acesso negado (não proprietário)' });
+
+      await conn.beginTransaction();
+      transactionStarted = true;
+      // Deleta alunos vinculados
+      await conn.execute('DELETE FROM students WHERE classroom_id = ?', [classroomId]);
+      // Deleta sala
+      await conn.execute('DELETE FROM classrooms WHERE id = ?', [classroomId]);
+
+      await conn.commit();
+      transactionStarted = false;
+      res.json({ success: true });
+    } catch (err) {
+      if (transactionStarted) try { await conn.rollback(); } catch (e) {}
+      throw err;
+    } finally {
+      conn.release();
+    }
+  } catch (err) {
+    console.error('Erro ao deletar sala:', err);
+    res.status(500).json({ error: 'Erro interno' });
+  }
+});
+
+/* ===== Remover sala com opção de manter/desvincular alunos ===== */
+app.post('/api/admin/classrooms/:id/remove', authenticateToken, async (req, res) => {
+  try {
+    if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Acesso negado' });
+    const classroomId = Number(req.params.id);
+    if (!classroomId) return res.status(400).json({ error: 'ID inválido' });
+
+    const { keepStudents = false } = req.body || {};
+
+    const conn = await pool.getConnection();
+    let transactionStarted = false;
+    try {
+      await ensureClassroomsOwnerColumn(conn);
+      await ensureStudentsOwnerColumn(conn);
+
+      const [rows] = await conn.execute('SELECT owner_user_id FROM classrooms WHERE id = ? LIMIT 1', [classroomId]);
+      if (rows.length === 0) return res.status(404).json({ error: 'Sala não encontrada' });
+      const owner = rows[0].owner_user_id;
+      const ownerId = req.user.sub || req.user.id;
+      if (owner && String(owner) !== String(ownerId)) return res.status(403).json({ error: 'Acesso negado (não proprietário)' });
+
+      await conn.beginTransaction();
+      transactionStarted = true;
+
+      if (keepStudents) {
+        // Desvincular alunos (set classroom_id to NULL) but keep student records
+        await conn.execute('UPDATE students SET classroom_id = NULL, owner_user_id = ? WHERE classroom_id = ?', [ownerId, classroomId]);
+      } else {
+        // Delete students linked to this classroom
+        await conn.execute('DELETE FROM students WHERE classroom_id = ?', [classroomId]);
+      }
+
+      // Delete the classroom
+      await conn.execute('DELETE FROM classrooms WHERE id = ?', [classroomId]);
+
+      await conn.commit();
+      transactionStarted = false;
+
+      res.json({ success: true, keepStudents: !!keepStudents });
+    } catch (err) {
+      if (transactionStarted) try { await conn.rollback(); } catch (e) {}
+      throw err;
+    } finally {
+      conn.release();
+    }
+  } catch (err) {
+    console.error('Erro ao remover sala (com opção):', err);
+    res.status(500).json({ error: err.message || 'Erro interno' });
   }
 });
 
@@ -675,18 +997,25 @@ app.post('/api/admin/import', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Campo "alunos" é obrigatório e deve ser um array não vazio' });
     }
 
+    const ownerId = req.user?.sub || req.user?.id || null;
+
     const conn = await pool.getConnection();
     let transactionStarted = false;
     try {
-      // Criar tabelas necessárias se não existirem (versão resiliente)
+      // Criar/adaptar tabelas necessárias se não existirem (versão resiliente)
+      await ensureClassroomsOwnerColumn(conn);
+      await ensureStudentsOwnerColumn(conn);
+
       await conn.execute(`
         CREATE TABLE IF NOT EXISTS classrooms (
           id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+          owner_user_id BIGINT UNSIGNED DEFAULT NULL,
           name VARCHAR(120) NOT NULL,
           turma VARCHAR(120) DEFAULT NULL,
           periodo VARCHAR(60) DEFAULT NULL,
           total_students INT DEFAULT 0,
-          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          KEY idx_classrooms_owner (owner_user_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
       `);
 
@@ -698,9 +1027,11 @@ app.post('/api/admin/import', authenticateToken, async (req, res) => {
           email VARCHAR(150) DEFAULT NULL,
           telefone VARCHAR(30) DEFAULT NULL,
           classroom_id BIGINT UNSIGNED DEFAULT NULL,
+          owner_user_id BIGINT UNSIGNED DEFAULT NULL,
           foto VARCHAR(500) DEFAULT NULL,
           ativo TINYINT(1) DEFAULT 1,
           created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          KEY idx_students_owner (owner_user_id),
           CONSTRAINT fk_students_classroom FOREIGN KEY (classroom_id) REFERENCES classrooms(id) ON DELETE SET NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
       `);
@@ -715,17 +1046,17 @@ app.post('/api/admin/import', authenticateToken, async (req, res) => {
           const name = String(sala.nome || '').trim();
           if (!name) continue;
 
-          // Verifica existência por nome + turma
+          // Verifica existência por nome + owner
           const [existing] = await conn.execute(
-            'SELECT id FROM classrooms WHERE name = ? LIMIT 1',
-            [name]
+            'SELECT id FROM classrooms WHERE name = ? AND owner_user_id = ? LIMIT 1',
+            [name, ownerId]
           );
           if (existing.length > 0) {
             salaIdMap.set(sala.id, existing[0].id);
           } else {
             const [result] = await conn.execute(
-              'INSERT INTO classrooms (name, turma, periodo, total_students) VALUES (?, ?, ?, ?)',
-              [name, sala.turma || null, sala.periodo || null, sala.totalAlunos || 0]
+              'INSERT INTO classrooms (name, turma, periodo, total_students, owner_user_id) VALUES (?, ?, ?, ?, ?)',
+              [name, sala.turma || null, sala.periodo || null, sala.totalAlunos || 0, ownerId]
             );
             salaIdMap.set(sala.id, result.insertId);
           }
@@ -738,14 +1069,15 @@ app.post('/api/admin/import', authenticateToken, async (req, res) => {
         if (!aluno || !aluno.nome) continue;
         const classroomDbId = salaIdMap.get(aluno.salaId) || null;
         await conn.execute(
-          `INSERT INTO students (nome, matricula, email, telefone, classroom_id, foto, ativo)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO students (nome, matricula, email, telefone, classroom_id, owner_user_id, foto, ativo)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             String(aluno.nome).trim(),
             aluno.matricula || null,
             aluno.email || null,
             aluno.telefone || null,
             classroomDbId,
+            ownerId,
             aluno.foto || null,
             aluno.ativo ? 1 : 0
           ]

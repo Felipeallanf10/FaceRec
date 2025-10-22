@@ -83,6 +83,7 @@ export default function Login() {
 
   // Credenciais de desenvolvimento/teste
   const credenciaisMock = {
+    '@administrador': { senha: '@administrador', role: 'admin', nome: 'Administrador do Sistema' },
     'admin@facerec.com': { senha: 'FaceRec@123', role: 'admin', nome: 'Administrador FaceRec' },
     'admin@escola.com': { senha: '123456', role: 'admin', nome: 'Administrador Sistema' },
     'administrador@escola.com': { senha: '123456', role: 'admin', nome: 'Administrador FaceRec' },
@@ -94,91 +95,98 @@ export default function Login() {
     e.preventDefault();
     setLoading(true);
     
-    console.log("🔄 Iniciando login com:", { email: formData.email });
-    
     try {
-      // Verificar se é uma credencial de desenvolvimento
-      const credencialMock = credenciaisMock[formData.email];
-      
-      if (credencialMock && formData.password === credencialMock.senha) {
-        // Login mock para desenvolvimento
-        console.log("🧪 Login mock detectado para:", formData.email);
-        
+      const emailInput = (formData.email || '').trim();
+      const normalizedLogin = emailInput.toLowerCase();
+      const fallbackDisplayName = (() => {
+        if (!emailInput) return 'Usuário FaceRec';
+        const cleaned = emailInput.replace(/^[^a-zA-Z0-9]+/, '');
+        if (!cleaned) return 'Usuário FaceRec';
+        if (!cleaned.includes('@')) return cleaned;
+        const [before, after] = cleaned.split('@');
+        return before || after || cleaned;
+      })();
+
+      console.log("🔄 Iniciando login com:", { email: emailInput });
+
+      const credencialMock = credenciaisMock[normalizedLogin];
+
+      try {
+        console.log("🌐 Tentando login real com API:", API_BASE);
+
+        const response = await api.post("/login", {
+          email: emailInput,
+          login: emailInput,
+          password: formData.password,
+        });
+        const data = response.data;
+        console.log("📥 LOGIN RESPONSE:", response.status, data);
+
+        if (!data?.token) throw new Error(data?.error || "Erro no login");
+
+        const apiUser = data?.user;
+        if (!apiUser?.id) {
+          throw new Error("Resposta da API não retornou dados do usuário");
+        }
+
+        console.log("💾 Salvando token:", data.token);
+        localStorage.setItem("token", data.token);
+
+        const resolvedRole = apiUser.role === 'admin' ? 'admin' : 'professor';
         const usuario = {
-          email: formData.email,
-          full_name: credencialMock.nome,
-          profile_picture: "",
-          photoURL: "",
-          role: credencialMock.role,
-          tipo: credencialMock.role === 'admin' ? 'administrador' : 'professor'
+          id: apiUser.id,
+          email: apiUser.email || emailInput,
+          full_name: apiUser.full_name || fallbackDisplayName,
+          profile_picture: apiUser.profile_picture || "",
+          photoURL: apiUser.photoURL || apiUser.profile_picture || "",
+          role: resolvedRole,
+          tipo: resolvedRole === 'admin' ? 'administrador' : 'professor',
+          subject: apiUser.subject || "",
+          school: apiUser.school || "",
+          phone: apiUser.phone || "",
+          cpf: apiUser.cpf || "",
+          classes: Array.isArray(apiUser.classes) ? apiUser.classes : [],
         };
 
-        console.log("🧪 Usuário criado para login mock:", usuario);
-        console.log("🧪 Role:", credencialMock.role);
-        console.log("🧪 Tipo:", credencialMock.role === 'admin' ? 'administrador' : 'professor');
-
-        localStorage.setItem("token", `mock-token-${Date.now()}`);
+        console.log("👤 Salvando usuário:", usuario);
         localStorage.setItem("usuario", JSON.stringify(usuario));
-  updateUser(usuario);
-        
-        // Verificar se foi salvo corretamente
-        const saved = localStorage.getItem("usuario");
-        console.log("🧪 Usuário salvo no localStorage:", saved);
-        console.log("🧪 Usuário parsed:", JSON.parse(saved));
-        
-        console.log("✅ Login mock bem-sucedido:", usuario);
-        
-        // Forçar recarregamento do contexto e navegação
-        setTimeout(() => {
-          // Recarregar a página para garantir que o contexto seja atualizado
-          window.location.href = "/alunos";
-        }, 200);
+        updateUser(usuario);
+
+        console.log("🎯 Redirecionando para /alunos");
+        navigate("/alunos", { replace: true });
         return;
+      } catch (apiError) {
+        const status = apiError.response?.status;
+        const errorPayload = apiError.response?.data;
+        console.warn("⚠️ Login via API falhou:", status, errorPayload || apiError.message);
+
+        const senhaCorreta = credencialMock && formData.password === credencialMock.senha;
+        if (senhaCorreta) {
+          console.log("🛟 Utilizando credencial mock após falha na API para:", emailInput);
+
+          const usuarioMock = {
+            id: `mock-${normalizedLogin}`,
+            email: emailInput,
+            full_name: credencialMock.nome || fallbackDisplayName,
+            profile_picture: "",
+            photoURL: "",
+            role: credencialMock.role,
+            tipo: credencialMock.role === 'admin' ? 'administrador' : 'professor'
+          };
+
+          localStorage.setItem("token", `mock-token-${Date.now()}`);
+          localStorage.setItem("usuario", JSON.stringify(usuarioMock));
+          updateUser(usuarioMock);
+
+          // Garantir atualização de contexto antes da navegação
+          setTimeout(() => {
+            window.location.href = "/alunos";
+          }, 200);
+          return;
+        }
+
+        throw apiError;
       }
-
-      // Se não é credencial mock, tenta login real com backend
-      console.log("🌐 Tentando login real com API:", API_BASE);
-      
-      const response = await api.post("/login", {
-        email: formData.email,
-        password: formData.password,
-      });
-      const data = response.data;
-      console.log("📥 LOGIN RESPONSE:", response.status, data);
-
-      if (!data?.token) throw new Error(data?.error || "Erro no login");
-
-      const apiUser = data?.user;
-      if (!apiUser?.id) {
-        throw new Error("Resposta da API não retornou dados do usuário");
-      }
-
-      console.log("💾 Salvando token:", data.token);
-      localStorage.setItem("token", data.token);
-
-      const resolvedRole = apiUser.role === 'admin' ? 'admin' : 'professor';
-      const usuario = {
-        id: apiUser.id,
-        email: apiUser.email || formData.email,
-        full_name: apiUser.full_name || formData.email.split("@")[0],
-        profile_picture: apiUser.profile_picture || "",
-        photoURL: apiUser.photoURL || apiUser.profile_picture || "",
-        role: resolvedRole,
-        tipo: resolvedRole === 'admin' ? 'administrador' : 'professor',
-        subject: apiUser.subject || "",
-        school: apiUser.school || "",
-        phone: apiUser.phone || "",
-        cpf: apiUser.cpf || "",
-        classes: Array.isArray(apiUser.classes) ? apiUser.classes : [],
-      };
-
-    console.log("👤 Salvando usuário:", usuario);
-    localStorage.setItem("usuario", JSON.stringify(usuario));
-    updateUser(usuario);
-      
-      console.log("🎯 Redirecionando para /alunos");
-      navigate("/alunos", { replace: true });
-      
     } catch (err) {
       const message = err.response?.data?.error || err.message || "Erro no login";
       console.error("❌ Login falhou:", message);
@@ -291,14 +299,16 @@ export default function Login() {
                 <div className="flex items-center gap-3">
                   <Mail className="h-5 w-5 text-slate-500 flex-shrink-0" />
                   <div className="flex-1 space-y-2">
-                    <label className="text-sm font-medium text-slate-700 text-ai">Email FaceRec</label>
+                    <label className="text-sm font-medium text-slate-700 text-ai">Email ou login FaceRec</label>
                     <input
-                      type="email"
+                      type="text"
+                      inputMode="email"
                       name="email"
                       value={formData.email}
                       onChange={handleChange}
                       required
-                      placeholder=""
+                      autoComplete="username"
+                      placeholder="Digite seu e-mail ou login"
                       className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200 text-ai bg-white/80"
                     />
                   </div>

@@ -12,13 +12,14 @@ dotenv.config({ path: envPath });
 
 const defaultAdmin = {
   fullName: 'Administrador FaceRec',
-  email: 'admin@facerec.com',
-  password: 'FaceRec@123',
+  email: process.env.DEFAULT_ADMIN_LOGIN || '@administrador',
+  password: process.env.DEFAULT_ADMIN_PASSWORD || '@administrador',
 };
 
 async function main() {
   const fullName = process.env.ADMIN_NAME || defaultAdmin.fullName;
-  const email = (process.env.ADMIN_EMAIL || defaultAdmin.email).trim().toLowerCase();
+  const emailRaw = process.env.ADMIN_EMAIL || defaultAdmin.email;
+  const email = String(emailRaw || '').trim().toLowerCase();
   const passwordRaw = process.env.ADMIN_PASSWORD || defaultAdmin.password;
 
   if (!email || !passwordRaw) {
