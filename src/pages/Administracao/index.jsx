@@ -1014,34 +1014,35 @@ const Administracao = () => {
         <div>
 
             {/* Header da seção Alunos com Seletor de Sala */}
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-xl font-semibold text-gray-800">
-                  Lista de Alunos
-                  {salaSelecionada && (
-                    <span className="ml-2 text-sm font-normal text-green-600">- {salaSelecionada.nome}</span>
-                  )}
-                </h2>
-                <div className="text-sm text-gray-500">{alunos.length} aluno(s) no total</div>
-              </div>
+            <div className="mb-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-800">
+                    Lista de Alunos
+                    {salaSelecionada && (
+                      <span className="ml-2 text-sm font-normal text-green-600">- {salaSelecionada.nome}</span>
+                    )}
+                  </h2>
+                  <div className="text-sm text-gray-500">{alunos.length} aluno(s) no total</div>
+                </div>
 
-              <div className="flex items-center space-x-3">
-                <div className="flex items-center space-x-2">
-                  <button onClick={selectAllVisiveis} className="px-3 py-1 bg-gray-100 rounded text-sm">Selecionar visíveis</button>
-                  <button onClick={clearSelection} className="px-3 py-1 bg-gray-100 rounded text-sm">Limpar seleção</button>
-                  <button onClick={handleDeleteSelected} className="px-3 py-1 bg-red-600 text-white rounded text-sm">Excluir selecionados</button>
+                {/* Botões de ação centralizados */}
+                <div className="flex items-center space-x-2 flex-1 justify-center mx-8">
+                  <button onClick={selectAllVisiveis} className="px-3 py-1 bg-gray-700 hover:bg-gray-800 text-white rounded text-sm transition-colors">Selecionar visíveis</button>
+                  <button onClick={clearSelection} className="px-3 py-1 bg-gray-700 hover:bg-gray-800 text-white rounded text-sm transition-colors">Limpar seleção</button>
+                  <button onClick={handleDeleteSelected} className="px-3 py-1 bg-red-700 hover:bg-red-800 text-white rounded text-sm transition-colors">Excluir selecionados</button>
                 </div>
 
                 {/* Seletor de Sala */}
-                <div className="flex items-center space-x-3">
-                  <label className="text-sm font-medium text-gray-700">Filtrar por sala:</label>
+                <div className="flex flex-col space-y-1">
+                  <label className="text-xs font-medium text-gray-700">Filtrar por sala:</label>
                   <select
                     value={salaSelecionada?.id || ''}
                     onChange={(e) => {
                       const salaId = e.target.value;
                       setSalaSelecionada(salaId ? salas.find(s => s.id == salaId) : null);
                     }}
-                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white min-w-[200px] text-sm"
+                    className="px-2 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white min-w-[180px] text-xs"
                   >
                     <option value="">🎓 Todos os Alunos ({alunos.length})</option>
                     {salas.map(sala => {

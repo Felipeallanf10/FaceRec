@@ -106,7 +106,7 @@ const Alunos = () => {
    */
   const fecharChamadaManual = () => {
     setModalChamada({ aberto: false, sala: null, alunos: [] });
-    navigate('/'); // Redireciona para a home page
+    // Permanece na página de salas de aula após salvar
   };
 
   const removerSala = async (sala, keepStudents) => {
