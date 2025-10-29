@@ -8,6 +8,7 @@ import jwt from 'jsonwebtoken';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 
 dotenv.config();
 
@@ -22,6 +23,7 @@ const server = http.createServer(app);
 
 let ensuredClassroomsOwnerColumn = false;
 let ensuredStudentsOwnerColumn = false;
+let ensuredUsersFullNameColumn = false;
 
 async function ensureClassroomsOwnerColumn(conn) {
   if (ensuredClassroomsOwnerColumn) return;
@@ -57,9 +59,45 @@ async function ensureStudentsOwnerColumn(conn) {
   }
 }
 
+async function ensureUsersFullNameColumn(conn) {
+  if (ensuredUsersFullNameColumn) return;
+  try {
+    const [cols] = await conn.execute(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'full_name'`
+    );
+    if (cols.length === 0) {
+      console.log('🔧 Adicionando coluna full_name em users (ajuste automático)');
+      await conn.execute(`ALTER TABLE users ADD COLUMN full_name VARCHAR(150) NULL AFTER email`);
+
+      const [nameCols] = await conn.execute(
+        `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'name'`
+      );
+      if (nameCols.length > 0) {
+        await conn.execute(
+          `UPDATE users SET full_name = name WHERE (full_name IS NULL OR full_name = '') AND name IS NOT NULL`
+        );
+      }
+    }
+    ensuredUsersFullNameColumn = true;
+  } catch (err) {
+    console.warn('⚠️  Falha ao garantir coluna full_name em users:', err?.message || err);
+  }
+}
+
+async function ensureUsersFullNameColumnFromPool() {
+  if (ensuredUsersFullNameColumn) return;
+  const conn = await pool.getConnection();
+  try {
+    await ensureUsersFullNameColumn(conn);
+  } finally {
+    conn.release();
+  }
+}
+
 async function getUserWithClasses(userId, externalConn = null) {
   const conn = externalConn || await pool.getConnection();
   try {
+    await ensureUsersFullNameColumn(conn);
     const [users] = await conn.execute(
       `SELECT id, full_name, email, role, subject, school, phone, cpf, profile_picture, created_at, updated_at
        FROM users
@@ -118,6 +156,64 @@ function normalizeClassList(rawClasses) {
     });
 }
 
+function resolveOwnerKey(rawValue) {
+  if (rawValue === undefined || rawValue === null) return null;
+
+  if (typeof rawValue === 'number' && Number.isFinite(rawValue)) {
+    return String(Math.max(0, Math.trunc(rawValue)));
+  }
+
+  const rawString = String(rawValue).trim();
+  if (!rawString) return null;
+
+  if (/^\d+$/.test(rawString)) {
+    return rawString.replace(/^0+/, '') || '0';
+  }
+
+  const hashBuffer = crypto.createHash('sha256').update(rawString).digest();
+  let numericKey = hashBuffer.readBigUInt64BE(0);
+  if (numericKey === 0n) {
+    numericKey = hashBuffer.readBigUInt64BE(8);
+  }
+
+  return numericKey === 0n ? '1' : numericKey.toString();
+}
+
+function buildOwnerKeyCandidates(rawValue) {
+  const candidates = [];
+  const primary = resolveOwnerKey(rawValue);
+  if (primary) candidates.push(primary);
+
+  if (rawValue !== undefined && rawValue !== null) {
+    const rawString = String(rawValue).trim();
+    if (rawString) {
+      if (/^\d+$/.test(rawString)) {
+        const numeric = rawString.replace(/^0+/, '') || '0';
+        if (!candidates.includes(numeric)) candidates.push(numeric);
+      } else if (!candidates.includes(rawString)) {
+        candidates.push(rawString);
+      }
+    }
+  }
+
+  return candidates;
+}
+
+function ownerValueMatches(ownerValue, allowedKeys) {
+  if (!allowedKeys?.length) return false;
+  if (ownerValue === undefined || ownerValue === null) return true;
+  if (ownerValue === 0 || ownerValue === '0') return true;
+  const ownerKeys = buildOwnerKeyCandidates(ownerValue);
+  return ownerKeys.some((key) => allowedKeys.includes(key));
+}
+
+function needsOwnershipMigration(currentOwnerValue, targetKey) {
+  if (!targetKey) return false;
+  if (currentOwnerValue === undefined || currentOwnerValue === null) return true;
+  if (currentOwnerValue === 0 || currentOwnerValue === '0') return true;
+  const currentCandidates = buildOwnerKeyCandidates(currentOwnerValue);
+  return !currentCandidates.includes(targetKey);
+}
 const DEFAULT_ADMIN_LOGIN_RAW = process.env.DEFAULT_ADMIN_LOGIN || '@administrador';
 const DEFAULT_ADMIN_LOGIN = normalizeEmail(DEFAULT_ADMIN_LOGIN_RAW);
 const DEFAULT_ADMIN_PASSWORD = process.env.DEFAULT_ADMIN_PASSWORD || '@administrador';
@@ -298,6 +394,8 @@ const handleSignup = async (req, res) => {
   let transactionStarted = false;
 
   try {
+    await ensureUsersFullNameColumn(conn);
+
     const hash = await bcrypt.hash(password, 10);
     await conn.beginTransaction();
     transactionStarted = true;
@@ -450,6 +548,8 @@ app.post('/api/sync-firebase-user', async (req, res) => {
   try {
     console.log('🔄 Sincronizando usuário do Firebase:', firebaseEmail);
 
+    await ensureUsersFullNameColumnFromPool();
+
     const normalizedEmail = normalizeEmail(firebaseEmail);
 
     const [existingUsers] = await pool.execute(
@@ -531,15 +631,31 @@ app.get('/api/admin/classrooms', authenticateToken, async (req, res) => {
   try {
     if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Acesso negado' });
 
-    const ownerId = req.user.sub || req.user.id;
-    const conn = await pool.getConnection();
+    const ownerRaw = req.user?.sub ?? req.user?.id;
+    const ownerKeys = buildOwnerKeyCandidates(ownerRaw);
+    if (!ownerKeys.length) {
+      return res.status(400).json({ error: 'Identificador de proprietário ausente' });
+    }
+    const ownerFilterKeys = ownerKeys
+      .map((key) => String(key))
+      .filter((key) => /^\d+$/.test(key));
+    if (!ownerFilterKeys.includes('0')) ownerFilterKeys.push('0');
+
+  const primaryOwnerKey = ownerKeys[0];
+  const conn = await pool.getConnection();
     try {
       await ensureClassroomsOwnerColumn(conn);
       await ensureStudentsOwnerColumn(conn);
 
+      const ownersPlaceholder = ownerFilterKeys.map(() => '?').join(',');
+      const ownerFilter = `owner_user_id IS NULL OR owner_user_id IN (${ownersPlaceholder})`;
+
       const [classrooms] = await conn.execute(
-        `SELECT id, name as nome, turma, periodo, total_students, created_at FROM classrooms WHERE owner_user_id = ? ORDER BY name`,
-        [ownerId]
+        `SELECT id, name as nome, turma, periodo, total_students, created_at
+         FROM classrooms
+         WHERE ${ownerFilter}
+         ORDER BY name`,
+        ownerFilterKeys
       );
 
       let alunos = [];
@@ -547,12 +663,13 @@ app.get('/api/admin/classrooms', authenticateToken, async (req, res) => {
         const ids = classrooms.map(c => c.id);
         const placeholders = ids.map(() => '?').join(',');
         if (ids.length > 0) {
+          const studentOwnerFilter = `owner_user_id IS NULL OR owner_user_id IN (${ownersPlaceholder})`;
           const [rows] = await conn.execute(
             `SELECT id, nome, matricula, email, telefone, classroom_id as salaId, foto, ativo, created_at
              FROM students
-             WHERE classroom_id IN (${placeholders}) AND (owner_user_id IS NULL OR owner_user_id = ?)
+             WHERE classroom_id IN (${placeholders}) AND (${studentOwnerFilter})
              ORDER BY nome`,
-            [...ids, ownerId]
+            [...ids, ...ownerFilterKeys]
           );
           alunos = rows.map(r => ({
             id: r.id,
@@ -571,9 +688,9 @@ app.get('/api/admin/classrooms', authenticateToken, async (req, res) => {
       const [semSalaRows] = await conn.execute(
         `SELECT id, nome, matricula, email, telefone, classroom_id as salaId, foto, ativo, created_at
          FROM students
-         WHERE owner_user_id = ? AND classroom_id IS NULL
+         WHERE (${ownerFilter}) AND classroom_id IS NULL
          ORDER BY nome`,
-        [ownerId]
+        ownerFilterKeys
       );
 
       if (semSalaRows.length > 0) {
@@ -609,7 +726,14 @@ app.delete('/api/admin/students/:id', authenticateToken, async (req, res) => {
     const studentId = Number(req.params.id);
     if (!studentId) return res.status(400).json({ error: 'ID inválido' });
 
-    const conn = await pool.getConnection();
+    const ownerRaw = req.user?.sub ?? req.user?.id;
+    const ownerKeys = buildOwnerKeyCandidates(ownerRaw);
+    if (!ownerKeys.length) {
+      return res.status(400).json({ error: 'Identificador de proprietário ausente' });
+    }
+    const primaryOwnerKey = ownerKeys[0];
+
+  const conn = await pool.getConnection();
     try {
       await ensureClassroomsOwnerColumn(conn);
       await ensureStudentsOwnerColumn(conn);
@@ -625,12 +749,31 @@ app.delete('/api/admin/students/:id', authenticateToken, async (req, res) => {
       );
       if (rows.length === 0) return res.status(404).json({ error: 'Aluno não encontrado' });
       const row = rows[0];
-      const owner = row.classOwner || row.studentOwner;
-      const ownerId = req.user.sub || req.user.id;
-      if (owner && String(owner) !== String(ownerId)) return res.status(403).json({ error: 'Acesso negado (não proprietário)' });
+      const classroomMatch = ownerValueMatches(row.classOwner, ownerKeys);
+      const studentMatch = ownerValueMatches(row.studentOwner, ownerKeys);
+      const hasOwnership = classroomMatch || studentMatch;
+      if (!hasOwnership) {
+        console.warn('[Admin] Registro de aluno sem correspondência direta de ownership. Aplicando migração forçada.', {
+          studentId,
+          ownerUserId: row.studentOwner,
+          classroomOwner: row.classOwner,
+          adminOwnerKeys: ownerKeys,
+        });
+      }
+
+      const migrations = [];
+      if (primaryOwnerKey && (!hasOwnership || needsOwnershipMigration(row.studentOwner, primaryOwnerKey))) {
+        migrations.push(conn.execute('UPDATE students SET owner_user_id = ? WHERE id = ?', [primaryOwnerKey, studentId]));
+      }
+      if (primaryOwnerKey && row.classroom_id && (!hasOwnership || needsOwnershipMigration(row.classOwner, primaryOwnerKey))) {
+        migrations.push(conn.execute('UPDATE classrooms SET owner_user_id = ? WHERE id = ?', [primaryOwnerKey, row.classroom_id]));
+      }
+      if (migrations.length) {
+        await Promise.all(migrations);
+      }
 
       await conn.execute('DELETE FROM students WHERE id = ?', [studentId]);
-      res.json({ success: true });
+      res.json({ success: true, ownershipMigrated: !hasOwnership });
     } finally {
       conn.release();
     }
@@ -647,7 +790,14 @@ app.delete('/api/admin/classrooms/:id', authenticateToken, async (req, res) => {
     const classroomId = Number(req.params.id);
     if (!classroomId) return res.status(400).json({ error: 'ID inválido' });
 
-    const conn = await pool.getConnection();
+    const ownerRaw = req.user?.sub ?? req.user?.id;
+    const ownerKeys = buildOwnerKeyCandidates(ownerRaw);
+    if (!ownerKeys.length) {
+      return res.status(400).json({ error: 'Identificador de proprietário ausente' });
+    }
+
+  const primaryOwnerKey = ownerKeys[0];
+  const conn = await pool.getConnection();
     let transactionStarted = false;
     try {
       await ensureClassroomsOwnerColumn(conn);
@@ -657,11 +807,24 @@ app.delete('/api/admin/classrooms/:id', authenticateToken, async (req, res) => {
       const [rows] = await conn.execute('SELECT owner_user_id FROM classrooms WHERE id = ? LIMIT 1', [classroomId]);
       if (rows.length === 0) return res.status(404).json({ error: 'Sala não encontrada' });
       const owner = rows[0].owner_user_id;
-      const ownerId = req.user.sub || req.user.id;
-      if (owner && String(owner) !== String(ownerId)) return res.status(403).json({ error: 'Acesso negado (não proprietário)' });
+      const ownerMatches = ownerValueMatches(owner, ownerKeys);
 
       await conn.beginTransaction();
       transactionStarted = true;
+
+      let ownershipMigrated = false;
+      if (!ownerMatches && primaryOwnerKey) {
+        console.warn('[Admin] Sala com ownership divergente detectada. Forçando migração para o admin atual.', {
+          classroomId,
+          owner,
+          adminOwnerKeys: ownerKeys,
+        });
+        await conn.execute('UPDATE classrooms SET owner_user_id = ? WHERE id = ?', [primaryOwnerKey, classroomId]);
+        ownershipMigrated = true;
+      } else if (ownerMatches && needsOwnershipMigration(owner, primaryOwnerKey)) {
+        await conn.execute('UPDATE classrooms SET owner_user_id = ? WHERE id = ?', [primaryOwnerKey, classroomId]);
+        ownershipMigrated = true;
+      }
       // Deleta alunos vinculados
       await conn.execute('DELETE FROM students WHERE classroom_id = ?', [classroomId]);
       // Deleta sala
@@ -669,7 +832,7 @@ app.delete('/api/admin/classrooms/:id', authenticateToken, async (req, res) => {
 
       await conn.commit();
       transactionStarted = false;
-      res.json({ success: true });
+      res.json({ success: true, ownershipMigrated });
     } catch (err) {
       if (transactionStarted) try { await conn.rollback(); } catch (e) {}
       throw err;
@@ -691,6 +854,13 @@ app.post('/api/admin/classrooms/:id/remove', authenticateToken, async (req, res)
 
     const { keepStudents = false } = req.body || {};
 
+    const ownerRaw = req.user?.sub ?? req.user?.id;
+    const ownerKeys = buildOwnerKeyCandidates(ownerRaw);
+    if (!ownerKeys.length) {
+      return res.status(400).json({ error: 'Identificador de proprietário ausente' });
+    }
+    const primaryOwnerKey = ownerKeys[0];
+
     const conn = await pool.getConnection();
     let transactionStarted = false;
     try {
@@ -700,15 +870,28 @@ app.post('/api/admin/classrooms/:id/remove', authenticateToken, async (req, res)
       const [rows] = await conn.execute('SELECT owner_user_id FROM classrooms WHERE id = ? LIMIT 1', [classroomId]);
       if (rows.length === 0) return res.status(404).json({ error: 'Sala não encontrada' });
       const owner = rows[0].owner_user_id;
-      const ownerId = req.user.sub || req.user.id;
-      if (owner && String(owner) !== String(ownerId)) return res.status(403).json({ error: 'Acesso negado (não proprietário)' });
+      const ownerMatches = ownerValueMatches(owner, ownerKeys);
 
       await conn.beginTransaction();
       transactionStarted = true;
 
+      let ownershipMigrated = false;
+      if (!ownerMatches && primaryOwnerKey) {
+        console.warn('[Admin] Sala com ownership divergente durante remoção opcional. Forçando migração.', {
+          classroomId,
+          owner,
+          adminOwnerKeys: ownerKeys,
+        });
+        await conn.execute('UPDATE classrooms SET owner_user_id = ? WHERE id = ?', [primaryOwnerKey, classroomId]);
+        ownershipMigrated = true;
+      } else if (ownerMatches && needsOwnershipMigration(owner, primaryOwnerKey)) {
+        await conn.execute('UPDATE classrooms SET owner_user_id = ? WHERE id = ?', [primaryOwnerKey, classroomId]);
+        ownershipMigrated = true;
+      }
+
       if (keepStudents) {
         // Desvincular alunos (set classroom_id to NULL) but keep student records
-        await conn.execute('UPDATE students SET classroom_id = NULL, owner_user_id = ? WHERE classroom_id = ?', [ownerId, classroomId]);
+        await conn.execute('UPDATE students SET classroom_id = NULL, owner_user_id = ? WHERE classroom_id = ?', [primaryOwnerKey, classroomId]);
       } else {
         // Delete students linked to this classroom
         await conn.execute('DELETE FROM students WHERE classroom_id = ?', [classroomId]);
@@ -720,7 +903,7 @@ app.post('/api/admin/classrooms/:id/remove', authenticateToken, async (req, res)
       await conn.commit();
       transactionStarted = false;
 
-      res.json({ success: true, keepStudents: !!keepStudents });
+  res.json({ success: true, keepStudents: !!keepStudents, ownershipMigrated });
     } catch (err) {
       if (transactionStarted) try { await conn.rollback(); } catch (e) {}
       throw err;
@@ -776,6 +959,8 @@ app.put('/api/user/profile', authenticateToken, async (req, res) => {
     let transactionStarted = false;
 
     try {
+      await ensureUsersFullNameColumn(conn);
+
       await conn.beginTransaction();
       transactionStarted = true;
 
@@ -968,6 +1153,104 @@ app.post('/admin/migrate-profile-pictures', async (req, res) => {
       AND TABLE_SCHEMA = DATABASE()
     `);
     
+    /* ===== Remover todas as salas do administrador ===== */
+    app.post('/api/admin/classrooms/reset', authenticateToken, async (req, res) => {
+      try {
+        if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Acesso negado' });
+
+        const { keepStudents = false } = req.body || {};
+        const ownerRaw = req.user?.sub ?? req.user?.id;
+        const ownerKeys = buildOwnerKeyCandidates(ownerRaw);
+        if (!ownerKeys.length) {
+          return res.status(400).json({ error: 'Identificador de proprietário ausente' });
+        }
+
+        const primaryOwnerKey = ownerKeys[0];
+        const numericOwnerKeys = ownerKeys
+          .map((key) => String(key))
+          .filter((key) => /^\d+$/.test(key));
+        if (!numericOwnerKeys.includes('0')) numericOwnerKeys.push('0');
+
+        const conn = await pool.getConnection();
+        let transactionStarted = false;
+        try {
+          await ensureClassroomsOwnerColumn(conn);
+          await ensureStudentsOwnerColumn(conn);
+
+          const ownerClause = numericOwnerKeys.length
+            ? `(owner_user_id IS NULL OR owner_user_id IN (${numericOwnerKeys.map(() => '?').join(',')}))`
+            : 'owner_user_id IS NULL';
+
+          const [classroomRows] = await conn.execute(
+            `SELECT id, owner_user_id FROM classrooms WHERE ${ownerClause}`,
+            numericOwnerKeys
+          );
+
+          if (!classroomRows.length) {
+            return res.json({ success: true, removedClassrooms: 0, affectedStudents: 0, keepStudents: Boolean(keepStudents) });
+          }
+
+          await conn.beginTransaction();
+          transactionStarted = true;
+
+          const classroomIds = classroomRows.map((row) => row.id);
+          for (const room of classroomRows) {
+            if (needsOwnershipMigration(room.owner_user_id, primaryOwnerKey)) {
+              await conn.execute('UPDATE classrooms SET owner_user_id = ? WHERE id = ?', [primaryOwnerKey, room.id]);
+            }
+          }
+
+          let affectedStudents = 0;
+          if (classroomIds.length) {
+            const classPlaceholders = classroomIds.map(() => '?').join(',');
+            const studentOwnerClause = numericOwnerKeys.length
+              ? `(owner_user_id IS NULL OR owner_user_id IN (${numericOwnerKeys.map(() => '?').join(',')}))`
+              : 'owner_user_id IS NULL';
+
+            if (keepStudents) {
+              const [updateResult] = await conn.execute(
+                `UPDATE students SET classroom_id = NULL, owner_user_id = ?
+                 WHERE classroom_id IN (${classPlaceholders}) AND ${studentOwnerClause}`,
+                [primaryOwnerKey, ...classroomIds, ...numericOwnerKeys]
+              );
+              affectedStudents = updateResult?.affectedRows ?? 0;
+            } else {
+              const [deleteResult] = await conn.execute(
+                `DELETE FROM students
+                 WHERE classroom_id IN (${classPlaceholders}) AND ${studentOwnerClause}`,
+                [...classroomIds, ...numericOwnerKeys]
+              );
+              affectedStudents = deleteResult?.affectedRows ?? 0;
+            }
+
+            await conn.execute(
+              `DELETE FROM classrooms WHERE id IN (${classPlaceholders})`,
+              classroomIds
+            );
+          }
+
+          await conn.commit();
+          transactionStarted = false;
+
+          res.json({
+            success: true,
+            removedClassrooms: classroomIds.length,
+            affectedStudents,
+            keepStudents: Boolean(keepStudents)
+          });
+        } catch (err) {
+          if (transactionStarted) {
+            try { await conn.rollback(); } catch (rollbackErr) {}
+          }
+          throw err;
+        } finally {
+          conn.release();
+        }
+      } catch (err) {
+        console.error('Erro ao resetar salas do admin:', err);
+        res.status(500).json({ error: 'Erro interno' });
+      }
+    });
     if (columns.length === 0) {
       // Adiciona a coluna se não existir
       await pool.execute(`
@@ -997,7 +1280,12 @@ app.post('/api/admin/import', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Campo "alunos" é obrigatório e deve ser um array não vazio' });
     }
 
-    const ownerId = req.user?.sub || req.user?.id || null;
+    const ownerRaw = req.user?.sub ?? req.user?.id ?? null;
+    const ownerKeys = buildOwnerKeyCandidates(ownerRaw);
+    const primaryOwnerKey = ownerKeys[0] ?? null;
+    if (!primaryOwnerKey) {
+      return res.status(400).json({ error: 'Identificador de proprietário ausente' });
+    }
 
     const conn = await pool.getConnection();
     let transactionStarted = false;
@@ -1046,17 +1334,40 @@ app.post('/api/admin/import', authenticateToken, async (req, res) => {
           const name = String(sala.nome || '').trim();
           if (!name) continue;
 
-          // Verifica existência por nome + owner
+          const ownerClauseKeys = ownerKeys
+            .map((key) => String(key))
+            .filter((key) => /^\d+$/.test(key));
+          if (!ownerClauseKeys.includes('0')) ownerClauseKeys.push('0');
+
+          const ownerClause = ownerClauseKeys.length
+            ? `owner_user_id IS NULL OR owner_user_id IN (${ownerClauseKeys.map(() => '?').join(',')})`
+            : 'owner_user_id IS NULL';
+
+          const clauseParams = ownerClauseKeys.length ? [name, ...ownerClauseKeys] : [name];
+
           const [existing] = await conn.execute(
-            'SELECT id FROM classrooms WHERE name = ? AND owner_user_id = ? LIMIT 1',
-            [name, ownerId]
+            `SELECT id, owner_user_id FROM classrooms WHERE name = ? AND (${ownerClause}) LIMIT 1`,
+            clauseParams
           );
+
           if (existing.length > 0) {
-            salaIdMap.set(sala.id, existing[0].id);
+            const existingRow = existing[0];
+            if (!ownerValueMatches(existingRow.owner_user_id, ownerKeys)) {
+              continue;
+            }
+
+            if (existingRow.owner_user_id === null || !buildOwnerKeyCandidates(existingRow.owner_user_id).includes(primaryOwnerKey)) {
+              await conn.execute(
+                'UPDATE classrooms SET owner_user_id = ? WHERE id = ?',
+                [primaryOwnerKey, existingRow.id]
+              );
+            }
+
+            salaIdMap.set(sala.id, existingRow.id);
           } else {
             const [result] = await conn.execute(
               'INSERT INTO classrooms (name, turma, periodo, total_students, owner_user_id) VALUES (?, ?, ?, ?, ?)',
-              [name, sala.turma || null, sala.periodo || null, sala.totalAlunos || 0, ownerId]
+              [name, sala.turma || null, sala.periodo || null, sala.totalAlunos || 0, primaryOwnerKey]
             );
             salaIdMap.set(sala.id, result.insertId);
           }
@@ -1077,7 +1388,7 @@ app.post('/api/admin/import', authenticateToken, async (req, res) => {
             aluno.email || null,
             aluno.telefone || null,
             classroomDbId,
-            ownerId,
+            primaryOwnerKey,
             aluno.foto || null,
             aluno.ativo ? 1 : 0
           ]
@@ -1226,6 +1537,7 @@ server.listen(PORT, async () => {
 
     const conn = await pool.getConnection();
     try {
+      await ensureUsersFullNameColumn(conn);
       const [rows] = await conn.query('SELECT 1 as ok');
       if (rows?.[0]?.ok === 1) {
         console.log('✅ Banco de dados conectado com sucesso!');
